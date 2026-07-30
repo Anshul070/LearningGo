@@ -1,0 +1,82 @@
+x  CHAPTER NAME
+!! IMPORTANT
+! HIGHLIGHT
+# COMMENT
+- POINTS
+% 
+? 
+~ 
+
+!! Chapter 1 :
+Go is its strict prohibition of cyclic imports. for example, package A depends on B, B depends on C, and
+C depends back on A.It completely forbids import cycles. If an import cycle exists, the code simply will not
+compile.
+
+x Go toolchain: "The complete set of tools that comes with the Go distribution"
+x The toolchain includes the compiler (which translates Go source code into
+x machine code), the linker (which assembles compiled code into an executable binary),
+x the runtime (which provides garbage collection, concurrency support, and other core
+x services at execution time), and the package manager (which resolves and manages
+x dependencies through modules). Additionally, the toolchain integrates utilities for
+x testing (go test), benchmarking, formatting (gofmt), and static analysis (go vet), all
+x working together in a cohesive workflow. This self-contained ecosystem is one of the
+x strengths of Go, as it eliminates the need for third-party build systems and ensures a
+x consistent developer experience across platforms.
+
+! Two ways to run program :
+# This will generate <filename>.exe file which can be directly executed. (Used in production)
+-   go build <filename>.go
+-   <filename>
+# This does not generate any new file but run the code directly. (Used while testing easy and fast)
+-   go run <filename>.go
+
+Execution always starts in main() within the main package
+Go is statically typed, but it also supports type inference.
+For example, x := 10 automatically infers x as an int type.
+- Constants can be typed or untyped;
+
+In Go, every variable you declare is automatically initialized with a zero value if you do not explicitly assign one.
+- Numeric types such as int and float64 default to 0. 
+- Booleans to false.
+- Strings to an empty string ("").
+- Pointers, slices,maps, channels, interfaces, and functions default to nil.
+
+! Public and private (exported and unexported)
+In Go, the iconcepts of public and private visibility are determined by the capitalization of
+identifiers rather than using explicit keywords such as public or private found in other
+languages. If a name — such as a variable, constant, function, type, or struct field — starts with
+an uppercase letter, it is exported, meaning it is publicly accessible from other packages.
+Conversely, if the name begins with a lowercase letter, it is unexported and thus private to the
+package in which it is defined.
+
+- For example, a function named PrintMessage() can be called from outside its package.
+- A function named printMessage() cannot.
+
+! Printing values (fmt = format)
+fmt package is used for printing for complete info we can run the command given below inside terminal.
+-    go doc fmt
+
+! Numeric data types
+# Signed integers
+- var a int8 = -128
+- var b int16 = -32768
+- var c int32 = -2147483648
+- var d int64 = -9223372036854775808
+# Unsigned integers
+- var ua uint8 = 255
+- var ub uint16 = 65535
+- var uc uint32 = 4294967295
+- var ud uint64 = 18446744073709551615
+# Machine-dependent integers
+- var e int = -42 // int (32-bit or 64-bit depending on architecture)
+- var f uint = 42 // uint
+# Floating-point numbers (default = float64)
+- var g float32 = 3.14159
+- var h float64 = 2.718281828459045
+# Complex numbers
+- var i complex64 = complex(1.5, -2.5)
+- var j complex128 = complex(3.0, 4.0)
+# Aliases
+- var k byte = 0xFF // byte is alias for uint8
+- var l rune = 'λ' // rune is alias for int32 (Unicode code point)
+

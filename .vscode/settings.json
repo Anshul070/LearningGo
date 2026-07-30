@@ -1,0 +1,114 @@
+{
+  "github.copilot.enable": false,
+  "github.copilot.inlineSuggest.enable": false,
+  "editor.inlineSuggest.enabled": false,
+  "editor.quickSuggestions": {
+    "other": false,
+    "comments": false,
+    "strings": false
+  },
+  "editor.suggestOnTriggerCharacters": false,
+  "editor.acceptSuggestionOnEnter": "off",
+  "tabnine.enabled": false
+  ,
+  "editor.formatOnSave": true,
+  "go.useLanguageServer": true,
+  "go.formatTool": "gofumpt",
+  "gopls": {
+    "formatting.gofumpt": true
+  },
+  "editor.semanticHighlighting.enabled": true,
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "comment",
+        "settings": {
+          "foreground": "#6A9955"
+        }
+      },
+      {
+        "scope": "string",
+        "settings": {
+          "foreground": "#CE9178"
+        }
+      },
+      {
+        "scope": "entity.name.function",
+        "settings": {
+          "foreground": "#4FC1FF"
+        }
+      },
+      {
+        "scope": "variable.parameter",
+        "settings": {
+          "foreground": "#C586C0"
+        }
+      },
+      {
+        "scope": "function",
+        "settings": {
+          "foreground": "#DCDCAA"
+        }
+      },
+      {
+        "scope": "support.function",
+        "settings": {
+          "foreground": "#DCDCAA"
+        }
+      },
+      {
+        "scope": "meta.function",
+        "settings": {
+          "foreground": "#DCDCAA"
+        }
+      },
+      {
+        "scope": "constant",
+        "settings": {
+          "foreground": "#9CDCFE"
+        }
+      },
+      {
+        "scope": "constant.language",
+        "settings": {
+          "foreground": "#9CDCFE"
+        }
+      },
+      {
+        "scope": "constant.numeric",
+        "settings": {
+          "foreground": "#9CDCFE"
+        }
+      },
+      {
+        "scope": "keyword",
+        "settings": {
+          "foreground": "#569CD6"
+        }
+      },
+      {
+        "scope": "invalid",
+        "settings": {
+          "foreground": "#F44747",
+          "fontStyle": "bold"
+        }
+      }
+    ]
+  },
+  "editor.semanticTokenColorCustomizations": {
+    "enabled": true,
+    "rules": {
+      "function": "#DCDCAA",
+      "method": "#DCDCAA",
+      "parameter": "#C586C0",
+      "property": "#9CDCFE",
+      "variable": "#9CDCFE",
+      "constant": "#9CDCFE",
+      "keyword": "#569CD6",
+      "string": "#CE9178",
+      "comment": "#6A9955",
+      "operator": "#569CD6",
+      "number": "#9CDCFE"
+    }
+  }
+}
