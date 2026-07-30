@@ -7,23 +7,15 @@ x  CHAPTER NAME
 ? 
 ~ 
 
-!! Chapter 1 :
+! Chapter 1 :
 Go is its strict prohibition of cyclic imports. for example, package A depends on B, B depends on C, and
 C depends back on A.It completely forbids import cycles. If an import cycle exists, the code simply will not
 compile.
 
 x Go toolchain: "The complete set of tools that comes with the Go distribution"
-x The toolchain includes the compiler (which translates Go source code into
-x machine code), the linker (which assembles compiled code into an executable binary),
-x the runtime (which provides garbage collection, concurrency support, and other core
-x services at execution time), and the package manager (which resolves and manages
-x dependencies through modules). Additionally, the toolchain integrates utilities for
-x testing (go test), benchmarking, formatting (gofmt), and static analysis (go vet), all
-x working together in a cohesive workflow. This self-contained ecosystem is one of the
-x strengths of Go, as it eliminates the need for third-party build systems and ensures a
-x consistent developer experience across platforms.
+x The toolchain includes the compiler (which translates Go source code into machine code), the linker (which assembles compiled code into an executable binary), the runtime (which provides garbage collection, concurrency support, and other core services at execution time), and the package manager (which resolves and manages dependencies through modules). Additionally, the toolchain integrates utilities for testing (go test), benchmarking, formatting (gofmt), and static analysis (go vet), all working together in a cohesive workflow. This self-contained ecosystem is one of the strengths of Go, as it eliminates the need for third-party build systems and ensures a consistent developer experience across platforms.
 
-! Two ways to run program :
+!! Two ways to run program :
 # This will generate <filename>.exe file which can be directly executed. (Used in production)
 -   go build <filename>.go
 -   <filename>
@@ -41,7 +33,7 @@ In Go, every variable you declare is automatically initialized with a zero value
 - Strings to an empty string ("").
 - Pointers, slices,maps, channels, interfaces, and functions default to nil.
 
-! Public and private (exported and unexported)
+!! Public and private (exported and unexported)
 In Go, the iconcepts of public and private visibility are determined by the capitalization of
 identifiers rather than using explicit keywords such as public or private found in other
 languages. If a name — such as a variable, constant, function, type, or struct field — starts with
@@ -52,11 +44,11 @@ package in which it is defined.
 - For example, a function named PrintMessage() can be called from outside its package.
 - A function named printMessage() cannot.
 
-! Printing values (fmt = format)
+!! Printing values (fmt = format)
 fmt package is used for printing for complete info we can run the command given below inside terminal.
 -    go doc fmt
 
-! Numeric data types
+!! Numeric data types
 # Signed integers
 - var a int8 = -128
 - var b int16 = -32768
@@ -80,3 +72,122 @@ fmt package is used for printing for complete info we can run the command given 
 - var k byte = 0xFF // byte is alias for uint8
 - var l rune = 'λ' // rune is alias for int32 (Unicode code point)
 
+% Can run this command inside ch01
+-   go run numeric.go
+
+!! Strings, bytes and runes:
+for condition, runs in bytes.
+for ...range, decodes UTF-8 sequences into runes automatically.
+- The stringsRunes.go 
+- go run stringsRunes.go
+Go program provides a comprehensive demonstration of how strings,
+bytes, and runes interact in the language.
+
+The code begins by declaring a string, str := "Go ♥ Zig", which contains both ASCII and a Unicode character (♥).
+While the string visually contains 8 characters, its lengthin bytes is 10 due to the 3-byte encoding of the heart symbol.
+The program first prints the string and its byte length using len(str), which reflects the raw storage size rather than the number of characters.
+It then performs a byte-wise iteration over the string using indexing, where each byte is printed individually.
+This highlights an important aspect of UTF8: characters such as ♥ are split across multiple bytes when accessed this way,
+and when printed, these individual bytes no longer represent valid or meaningful characters on their own.
+To correctly interpret characters, the program uses a for ... range loop, which decodes UTF-8 sequences into runes.
+In this loop, Go correctly identifies each Unicode character in the string, including the multibyte heart symbol,
+and prints its position, character representation, and Unicode code point.
+
+[]byte slice to view its raw byte representation, []rune slice to access the decoded Unicode code points.
+This distinction is crucial in systems programming: 
+[]byte provides precise control over encoding and memory layout, while []rune enables character-level manipulation.
+utf8.RuneCountInString() function to compute the actual number of characters.
+
+
+!! Learning about strings.Builder
+strings.Builder is a powerful and efficient way to construct strings in Go.
+Introduced in Go 1.10, it helps you build strings incrementally without creating many intermediate string values,
+which would otherwise cause repeated allocations and memory copying.
+
+- WriteString(s string), which appends a string to its internal buffer without creating a new string allocation
+- Write(p []byte) appends a slice of bytes
+- WriteByte(b byte) appends a single byte, making it ideal for ASCII-heavy string construction
+- WriteRune(r rune) appends a single UTF-8 encoded code point, allowing you to mix ASCII and multibyte characters seamlessly.
+
+You can retrieve the result using the String() method.
+- Len() reports the number of bytes currently in the buffer.
+- Cap() returns the buffer's total capacity.
+
+If you know in advance how much data you will write.
+- Grow(n int) can preallocate enough space to reduce memory copying and improve performance.
+
+If you wish to reuse a strings.Builder instance.
+- Reset() clears the buffer so it can be used again from scratch.
+You can learn more about strings.Builder.
+- go doc strings.Builder
+
+% (stringOperations.go) demonstrates how to efficiently build and manipulate strings using the strings.Builder type
+It appends strings using WriteString() and adds formatted content via fmt.Fprintf().
+After building the final string, it retrieves its value using builder.String()
+
+
+!! Error handling
+In Go, errors are treated as values, making them easy to create, return, and manage consistently.
+Go uses error values to signal failure, making error handling an integral part of normal program flow.
+As Go functions can have multiple return values, when they fail, they typically return an error as an additional result,
+and it is the caller function's responsibility to inspect and handle it. Go also provides tools such as the errors and
+fmt packages for creating, wrapping, and formatting errors, as well as the errors.Is() and errors.As() helpers for advanced inspection.
+% Run (errorHandling.go) on your machine
+- It uses errors.As() to determine whether the returned error is of the custom *DivideError type that we have created.
+- It tries to open a non-existent file called /tmp/nonexistent.txt. Since the file does not exist, os.Open() returns an error. By using errors.Is(err, os.ErrNotExist), the code checks whether the specific error matches os.ErrNotExist and, if true, prints a user-friendly message indicating that the file is missing.
+
+
+!! Array and slices
+Arrays offer predictability and fixed-size precision, while slices provide flexibility and idiomatic power without sacrificing performance.
+
+!! Array:
+Arrays in Go are fixed-size, indexed collections of elements of the same type. (There is a way to add diff type of values by giving [any] of [interface{}] type to the array)
+- var a [3]int, which declares an array of three integers.
+- a := [3]int{10, 20, 30} you can also use a composite literal
+a[0] refers to the first element, a[1] thesecond, and so on.
+Arrays in Go are value types. Therefore, assigning one array to another array copies all its elements.
+x Arrays in Go carry their size as part of their type, which means [4]int and [8]int are distinct and incompatible types.
+
+!! Slices:
+Slices in Go are dynamic, flexible views into arrays. They provide a more convenient and expressive way to work with sequences of data without sacrificing the performance benefits of contiguous memory. A slice does not store data itself, but rather it describes a segment of an underlying array, through three components: a pointer to the first element, a length (the number of accessible elements), and a capacity (the number of elements from the start to the end of the backing array)
+- s := []int{1, 2, 3} using a composite literal.
+- s := a[1:3] by slicing an array which selects elements from index 1 up to (but not including) index 3.
+- Slices grow and shrink through operations such as append()
+Their behavior is tightly coupled with the Go memory model and garbage collector and the capacity of a slice is handled by Go.
+- make() function we can define the capacity of a slice at creation time using this function, after that, the capacity of the slice doubles each time the length of the slice is about to become bigger than its current capacity.
+- numbers := make([]int, 3, 5) creates a slice of integers with a length of 3 and a capacity of 5.
+
+
+!! Slicing:
+In Go, slicing refers to the creation of a new view (slice) into an existing array or slice without copying the underlying data. Both arrays and slices support slicing using the syntax a[start:end]
+- arr := [5]int{10, 20, 30, 40, 50}, then sub := arr[1:4] creates a slice containing the elements {20, 30, 40}.
+- a[:end] to slice from the beginning, a[start:] to slice until the end, and a[:] to create a slice of the entire array.
+x The existing elements are copied into this new array, and the returned slice now references it independently. From this point forward, changes to the new slice do not affect the original array or any other slices based on the old array.
+% Run (slicing.go) to check all this.
+x The key takeaway is that slices act as views into arrays and share data until an append operation exceeds their capacity.When that happens, Go seamlessly switches the slice to a new, independent array, making further modifications isolated from the original data. This behavior makes slicing both efficient and flexible, as Go minimizes allocations when possible but transparently creates new storage when needed.
+x Go passes these values to functions: arrays are passed by value, meaning a full copy is made, while slices are passed by reference, sharing the same underlying array.
+
+
+!! Funtions
+Functions are a core building block of any Go program, and they allow you to organize logic, reuse code, and work with data more effectively. Functions in Go are first-class citizens as they can be assigned to variables, passed as arguments, and returned from other functions. 
+x Go enforces strict type declarations for both parameters and return values, promoting explicit, type-safe design. Multiple return values are supported natively and are often used to return a value along with an error, following the idiomatic error-handling model of Go.
+x Function literals, or anonymous functions, can be declared inline and are commonly used as closures, capturing local state for later execution.
+% Run functions.go on your machine
+- greet(), which takes a string parameter and returns a greeting, showing the most basic form of function declaration.
+- divide() function illustrates multiple return values, a powerful Go feature: it returns both a float64 result and an error, encouraging explicit error handling instead of exceptions.
+- ectangleStats() function uses named return values, allowing us to define and return variables directly withoutspecifying them in the return statement.
+- joinStrings() function introduces variadic functions, which can accept any number of arguments — here, multiple strings are joined using the chosen separator.
+- applyTwice() function demonstrates higher-order functions by accepting another function as an argument and applying it twice to a value
+
+!! Iterator functions
+Introduced in Go version 1.23, iterator functions allow you to create lazy, on-demand sequences of values without allocating intermediate slices or arrays. Instead3 0 5 d 6 1 f 5 _ x d i of returning all results at once, an iterator yields one value at a time and pauses execution until the next value is requested, thus enabling you to use the range keyword directly over functions that yield values.
+% Run functionIterators.go on your machine
+- Checking if !yield(a) ensures that if the calling loop triggers a break, the iterator safely stops generating data immediately and avoids executing unnecessary loops
+- yield is a function, not a keyword. In Go, yield is just a variable name for a callback function supplied automatically by the for...range loop. It has the signature func(int) bool.When you call yield(a), you are actively pushing the number a directly into the body of the for loop.
+- The for...range loop controls executionWhen you write for num := range fibonacci(10), Go transforms your loop behind the scenes.Your fibonacci function runs and enters its internal loop.Every time your code executes yield(a), execution pauses in fibonacci, jumps into your main loop to execute fmt.Printf, and then jumps back to fibonacci to calculate the next number.
+- Why yield returns a booleanThe yield function returns true or false to tell the generator whether to keep going.If your main loop is running normally, yield returns true.If your main loop hits a break statement, yield returns false. Your code checks if !yield(a) { return } so it can stop calculating immediately and save CPU cycles.
+
+
+!! Learning how to use regular expressions
+Pattern matching is itechnique for searching a string for some set of characters based on a specific search pattern expressed in terms of regular expressions and grammar. A regular expression is a sequence of characters that defines a search pattern.
+- (ch01/regularExp.go) Regular expressions and pattern matching are illustrated in this file.
