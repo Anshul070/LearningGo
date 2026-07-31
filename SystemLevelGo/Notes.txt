@@ -1,13 +1,14 @@
-x  CHAPTER NAME
-!! IMPORTANT
-! HIGHLIGHT
-# COMMENT
-- POINTS
-% 
-? 
-~ 
+!   CHAPTER
+!!  Topics
+-   POINTS
+x   HIGHLIGHT
+#   COMMENT
+%   Filename
 
-! Chapter 1 :
+
+
+
+!   --------------------------------------------------CHAPTER 1------------------------------------------------------------
 Go is its strict prohibition of cyclic imports. for example, package A depends on B, B depends on C, and
 C depends back on A.It completely forbids import cycles. If an import cycle exists, the code simply will not
 compile.
@@ -140,7 +141,7 @@ fmt packages for creating, wrapping, and formatting errors, as well as the error
 !! Array and slices
 Arrays offer predictability and fixed-size precision, while slices provide flexibility and idiomatic power without sacrificing performance.
 
-!! Array:
+- Array:
 Arrays in Go are fixed-size, indexed collections of elements of the same type. (There is a way to add diff type of values by giving [any] of [interface{}] type to the array)
 - var a [3]int, which declares an array of three integers.
 - a := [3]int{10, 20, 30} you can also use a composite literal
@@ -148,7 +149,7 @@ a[0] refers to the first element, a[1] thesecond, and so on.
 Arrays in Go are value types. Therefore, assigning one array to another array copies all its elements.
 x Arrays in Go carry their size as part of their type, which means [4]int and [8]int are distinct and incompatible types.
 
-!! Slices:
+- Slices:
 Slices in Go are dynamic, flexible views into arrays. They provide a more convenient and expressive way to work with sequences of data without sacrificing the performance benefits of contiguous memory. A slice does not store data itself, but rather it describes a segment of an underlying array, through three components: a pointer to the first element, a length (the number of accessible elements), and a capacity (the number of elements from the start to the end of the backing array)
 - s := []int{1, 2, 3} using a composite literal.
 - s := a[1:3] by slicing an array which selects elements from index 1 up to (but not including) index 3.
@@ -191,3 +192,92 @@ Introduced in Go version 1.23, iterator functions allow you to create lazy, on-d
 !! Learning how to use regular expressions
 Pattern matching is itechnique for searching a string for some set of characters based on a specific search pattern expressed in terms of regular expressions and grammar. A regular expression is a sequence of characters that defines a search pattern.
 - (ch01/regularExp.go) Regular expressions and pattern matching are illustrated in this file.
+
+x In regular expressions, the \w symbol represents any "word character," which, in Go and most modern regex engines, means letters (both uppercase and lowercase), digits, and the underscore character. In other words, \w matches the same set as [A-Za-z0-9_]. Alongside \w, there are several other special shorthand character classes worth remembering. For instance, \d matches any digit ([0-9]). Similarly, \s matches any whitespace character, such as space, tab, or newline, and \S matches any nonwhitespace character. The dot (.) is also important — it matches any single character except a newline by default. Anchors such as ^ and $ are also crucial: ^ asserts that a match must start at the beginning of a string, while $ asserts that it must occur at the end.
+
+- Simple Matching (First part of the code):
+1. We gave regex.MustCompile() the pattern("Go") and then used MatchString() on the test to find that it matches or not.
+2. We used regex.MustComplie() not regex.Complie() because MustComplie() panics if the regular expression syntax is not valid like: [A-z
+
+- Finding all matches (Second Part of the code):
+1. We created a pattern `[A-Z][a-z]+` which means the first character is the capital and the second character is the lower case.
+2. Then we used regex.MustCompile(pattern) and used FindAllStrings(text, -1) which Finds string inside the text number of strings it will find is -1 which means it will find all the strings.
+
+- Extracting Submatches (Third part of the code):
+1. There are three parts in the pattern (\w+) and (\w+\.\w+). \w means "words" and + means as many as there are present.
+2. Full pattern means the match should start with any word (\w+), followed by the "@" symbol and then (\w+\.\w+) means that the match should have word \w+\ following by "." and there another word.
+3. Then after compilation it is used on email.
+4. it will check and store the email in array. we can access using [i] like we use on array.
+    a. [0] : full email.
+    b. [1] : username.
+    c. [2] : domain.
+
+- Replacing all the strings (Fourth part of the code) :
+1. Created pattern (\d+) only digits are allowed then passed to Mus compile.
+2. Passed on text and used ReplaceAllString(text, "XXXX") this will replace the digits with "XXXX" and return a new string.
+
+- Validation Input (Fifth part of the code) :
+1. Pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" that means :
+    a. "^" and "$" means that staring and ending of the string must match.
+    b. [a-zA-Z0-9._%+-] mean any alphabet lower/uppercase or any digit including symobols "._%+-"
+    c. "+@" after that it should have @ and and then next part includes 
+    d. [a-zA-Z0-9.-] mean any alphabet lower/uppercase or any digit including symobols ".-"
+    e. After all this should have "." then it should includes
+    f. [a-zA-Z]{2,} means it can have alphabet lower/uppercase but minimun number is 2.
+2. We compile this pattern using the MustCompile() then tested using MatchString().
+3. Returming true/false and printing on that bases.
+
+
+!! Working with command-line arguments
+The simplest way to access arguments passed to a program is through os.Args, a slice of strings where os.Args[0] holds the program name, and the remaining elements represent the arguments themselves.
+However, for more robust and user-friendly handling, Go provides the flag package, which lets you define options, default values, and parse user input seamlessly.
+- (ch01/cla.go), that demonstrates the reading and the handling of command-line arguments and options.
+
+- (os.Args)
+1. os.Args[0] has the file name and after that all the arguments given by commandline interface.
+2. First we get the program name using filepath.Base(os.Args[0]) as os.Args[0] has the full path like directory name we just extraced the filename using the filepath.
+3. if lenght of os.Args is greater than 1 than that means it has more arguments we can use.
+4. Then we printed those arguments using the for range loop.
+
+- (flag)
+1. We can create flags using flap package.
+2. We created three packages named (port), (host), and (debug) by default they have these values (8080), (localhost), and (false) respectively, and also they are given discription (Port to listen on.), (Hostname or IP), (Enable debug mode) respectively.
+3. We can pass the values using the flag like (-port=5173) or (--port=5173)
+4. We create 3 flags using flag package,
+5. Then used (flag.Parse()) which will handel the (os.Args) itself and extract the values from the commandline arguments.
+6. We can use the (flags.Args()) to check the remaining Non-flag arguments that are not needed.
+7. We can also use (-help) flag for the getting help from glag package it will display all the flaged arguments it can accept.
+
+
+!! The viper and cobra packages:
+When os and flag are not powerful enough for a complex command-line tool such as docker or hugo, we can turn to the viper and cobra packages.
+
+- The viper package:
+It allows you to load configuration values from JSON, TOML, YAML, HCL, INI, or environment variables, as well as directly from command-line flags. It integrates seamlessly with the cobra package, enabling developers to build CLI applications where configuration can come from various layers without additional boilerplate code. Internally, viper maintains a key-value store and provides methods such as Set(), Get(), BindEnv(), and BindPFlag() to manage configuration hierarchies efficiently.
+
+- The cobra package:
+Each command in cobra is represented as a *cobra.Command struct, which defines its name, description, arguments, and behavior via a Run() function.It also offers built-in support for hierarchical commands, meaning you can organize related functionality under parent commands, improving usability and clarity for end users. Additionally, it automatically generates robust and customizable help and usage messages, reducing the need for manual documentation.
+
+
+!! We are going to implement simplified versions of two classic Unixutilities: which(1) and basename(1).
+
+- Implementing: (which(1))
+which(1) utility, a classic Unix command that locates the executable file associated with a given command by searching through the directories listed in the PATH environment variable. We will leverage the os and path/filepath packages to inspect directories, combine paths, and verify permissions.
+% (ch01/which.go)
+
+x When we say idiomatic Go, we mean writing Go code in the style and spirit that the Go community has collectively embraced as natural, clear, and efficient. Every programming language has its own set of unwritten rules and conventions beyond mere syntax, and in Go, these idioms emphasize simplicity, readability, and explicitness. For example, idiomatic Go favors using short variable names in small scopes (i, n, err), handling errors immediately rather than deferring them, and returning multiple values instead of exceptions. It also encourages leveraging the powerful abstractions of the standard library (such as io.Reader and io.Writer), using slices and maps instead of reinventing data structures, and embracing the concurrency model of Go with goroutines and channels. To call code idiomatic Go is to say it looks like it belongs in the language — that another Go programmer could read it easily, understand its intent, and see that it follows the design philosophy of Go itself. In practice, this often means prioritizing clarity over cleverness, explicit error handling over hidden control flow, and minimalism over abstraction-heavy designs. The phrase is a reminder that Go is not just about what the compiler accepts, but about writing code that fits well with the ecosystem and communicates effectively with other developers.
+
+
+- Implementing: (before(1))
+While which(1) focuses on locating files across multiple directories, basename(1) deals with extracting the final component of a single file path, optionally removing any specified suffixes. So, in this section, we will implement a Go version of the basename(1) utility, a classic Unix command-line tool that extracts the final component of a file path.
+-       go run basename /usr/bin/sort               ==> sort
+-       go run basename /usr/bin/hand..fe. ..fe.    ==> hand
+-       go run basename /var/log/nginx/             ==> nginx
+% (ch01/basename.go)
+
+
+!! Summary :
+!! As we conclude this comprehensive journey through the foundational elements of Go, from basic data types and control structures that form the backbone of logical flow to the rich data structures of arrays and slices.However, we have only scratched the surface of what Go has to offer the systems programmer.In the next chapter, we bring together three essential features of the language: maps, structures, and functions. Maps provide a flexible way to associate keys with values, whereas structures allow us to design custom types that mirror realworld entities, and functions, meanwhile, enable us to encapsulate logic and reuse it across programs.
+
+
+
