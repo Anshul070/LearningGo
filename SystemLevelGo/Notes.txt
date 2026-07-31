@@ -4,8 +4,8 @@
 x   HIGHLIGHT
 #   COMMENT
 %   Filename
-
-
+~ 
+? 
 
 
 !   --------------------------------------------------CHAPTER 1------------------------------------------------------------
@@ -281,3 +281,203 @@ While which(1) focuses on locating files across multiple directories, basename(1
 
 
 
+!   --------------------------------------------------CHAPTER 2------------------------------------------------------------
+
+!! Data Collections and Functions
+Maps let you associate keys with values efficiently, and structs allow you to bundle related fields together into a custom type. Maps serve as the Go built-in associative array type, offering efficient key-value storage with a hash table implementation under the hood. Under the hood, Go implements maps as hash tables, providing average O(1) time (constant) complexity for insertions, deletions, and lookups. Maps are more powerful data structures because they allow you to use indexes of various data types as keys to look up your data if these keys are comparable – if a type cannot be compared using == and !=, you cannot use it as map key.
+
+You can declare a map without initialization, such as 
+- var grades map[string]int
+which resultsin a nil map that cannot be used until it is initialized.
+Alternatively, you can create an empty map with string keys and int values, with make using 
+- scores := make(map[string]int)
+Another way is to define a map literal with predefined values, as seen with 
+- inventory := map[string]int{"apples": 50, "bananas": 30, "oranges": 25}
+If you start with a nil map,you must initialize it using make before adding elements.
+
+You can assign values directly using the key, such as 
+- grades["Marietta"] = 95 or scores["Team A"] = 150
+Updating existing entries works the same way – assigning a new value to an existing key automatically replaces the old one. For instance, 
+- grades["Marietta"] = 98 
+updates Marietta's grade.
+
+When you access value from a map using a key, Go returns the associated value if it exists. If the key is missing, Go returns the zero value for the value type of the map. For example, if grades["David"] does not exist, the returned value will be 0 since the map stores integers.
+
+- if grade, exists := grades["David"]; exists {
+-   fmt.Printf("Marietta exists with grade: %d\n", grade)
+- }
+
+The exists Boolean tells you whether the key is present in the map, allowing you to handle missing data gracefully.
+Maps in Go allow you to remove entries using the delete() function, which is presented next:
+- delete(grades, "Epifanios")
+- fmt.Printf("After deleting Epifanios: %v\n", grades)
+% Deleting non-existent key is safe (no-op)
+- delete(grades, "NonExistent")
+% delete(grades, "Epifanios") removes the entry for Epifanios. Importantly, deleting a non-existent key is safe – Go simply ignores the request without throwing an error.
+
+Iteration over maps using the range keyword:
+- for name, grade := range grades {
+-    fmt.Printf(" %s: %d\n", name, grade)
+- }
+
+You can quickly find the number of key-value pairs in a map using the built-in len() function. So, len(grades) returns the number of students currently in the map.
+Keys can be strings, integers, Booleans, and more, as long as they are comparable types.
+
+You can nest maps inside other maps to represent hierarchical data:
+- studentGrades := map[string]map[string]int{
+-   "Alice": {"Math": 95, "Science": 92, "English": 88},
+-   "Bob": {"Math": 87, "Science": 90, "English": 85},
+- }
+
+Maps in Go are reference types, meaning assigning one map to another does not create a deep copy. Instead, both variables point to the same underlying data. Modifying one map affects the other.
+- fmt.Println("10. Maps are Reference Types:")
+- original := map[string]int{"a": 1, "b": 2}
+- copy := original // This creates a reference, not a copy
+- fmt.Printf("Original: %v\n", original)
+- fmt.Printf("Copy: %v\n", copy)
+- copy["c"] = 3 // Modifying copy affects original
+- fmt.Printf("After modifying copy:\n")
+- fmt.Printf("Original: %v\n", original)
+- fmt.Printf("Copy: %v\n", copy)
+- fmt.Println()
+
+% (maps.go) execute this file on your machine.
+
+x While maps are great for key-value storage, they are not always ideal for modeling structured information. This is where structures (or structs in Go) come in.
+
+
+!! Understanding the versatility of structures
+While JSON can be parsed without using structs, defining structs with appropriate field tags makes encoding and decoding JSON significantly more convenient and type-safe. Struct tags allow encoding libraries to map JSON fields directly onto struct fields, simplifying data validation and improving readability when working with structured data. Structs allow you to group fields of different types under a single, cohesive unit, making your data easier to manage, pass around, and reason about.
+% (structure.go) file
+The program imports six key packages that enable different aspects of struct manipulation: encoding/json for converting structs to and from JSON format, fmt for formatted input/output operations, reflect for runtime type inspection and manipulation, strings for string processing utilities, time for working with temporal data within structs, and unsafe for low-level memory operations and size calculations.
+
+x The code demonstrates a more sophisticated struct definition that showcases Go's ability to combine multiple data types within a single composite structure.
+- type Product struct {
+-   ID int
+-   Name string
+-   Price float64
+-   InStock bool
+-   Tags []string
+-   CreatedAt time.Time
+- }
+The ID field uses an integer for unique identification, while Name employs a string for textual representation. The Price field utilizes float64 for precise decimal inumber handling, which is essential for financial calculations, and InStock uses a Boolean to represent binary state information. The Tags field introduces a slice type []string, demonstrating how structs can contain collections of data, allowing a single product to be associated with multiple categorical labels or keywords. Finally, the CreatedAt field uses time.Time from the imported time package
+
+x One of the most powerful features of Go: struct embedding, which implements composition-based inheritance as an alternative to the traditional class-based inheritance found in other object-oriented languages.
+- type Employee struct {
+-   Person // Embedded struct (anonymous field)
+-   ID int
+-   Department string
+-   Salary float64
+-   IsManager bool
+- }
+x This embedding syntax allows the Employee struct to automatically inherit all the fields from embedded structs, meaning an Employee instance can directly access Name, Age, and City from the Person struct
+
+When embedding structs, each embedded type retains its own identity and can always be accessed explicitly through qualification (for example, employee.Person.City)
+
+% (structure.go) file
+x The BankAccount struct ishowcases the simple but effective approach of Go to access control, where field names beginning with uppercase letters (AccountNumber) are exported (public) and accessible from other packages, while field names beginning with lowercase letters (balance and ownerName) are unexported (private) and only accessible within the same package. This visibility mechanism protects sensitive data such as account balance and owner information from direct external manipulation while still allowing controlled access through the public account number field.
+
+
+~ The User struct showcases how struct tags, which are string literals enclosed in backticks following field declarations, provide a declarative way to specify how fields should be handled by different systems without cluttering the struct definition with imperative code. Each field contains multiple tags separated by spaces, with each tag consisting of a key-value pair that instructs specific libraries or frameworks on how to process that field.
+- type User struct {
+-   ID int `json:"id" db:"user_id" validate:"required"`
+-   Username string `json:"username" db:"username" validate:"required,min=3"`
+-   Email string `json:"email" db:"email" validate:"required,email"`
+-   Password string `json:"-" db:"password_hash"` // "-" excludes from JSON
+-   FullName string `json:"full_name,omitempty" db:"name"` // omitempty excludes
+-   if empty
+- } `json: "user"`
+~ The struct tags illustrate various serialization control mechanisms that the encoding/jsonpackage recognizes and respects during marshaling and unmarshaling operations – marshaling is the process of converting a data structure into a format suitable for storage or transmission (such as JSON or bytes) while unmarshaling is the reverse operation. The ID, Username, and Email fields use straightforward mappings that specify the JSON field names, allowing Go conventional PascalCase field names to be converted to more typical snake_case or camelCase JSON representations. The Password field demonstrates data protection using the special json:"-" tag, which completely excludes the field from JSON serialization, ensuring that sensitive information never appears in API responses or log files. The FullName field uses the omitempty directive, which instructs the JSON encoder to exclude the field from output when it contains the zero value for its type, reducing JSON payload size and avoiding unnecessary null fields The db tags specify database column names, allowing the struct to serve as both a Go data model and a database schema representation. The validate tags provide declarative validation rules that validation libraries can process, specifying requirements such as mandatory fields (required), minimum string lengths (min=3), and format validation (email) without requiring separate validation logic.
+
+! Struct Tags and JSON
+- user := User{
+-   ID: 1,
+-   Username: "johndoe",
+-   Email: "john@example.com",
+-   Password: "secret123",
+-   FullName: "John Doe",
+- }
+
+! Convert to JSON
+- jsonData, err := json.Marshal(user)
+- if err != nil {
+-   fmt.Printf("JSON marshal error: %v\n", err)
+- } else {
+-   fmt.Printf("JSON representation: %s\n", string(jsonData))
+- }
+
+! Reflect on struct tags
+- userType := reflect.TypeOf(user)
+- for i := 0; i < userType.NumField(); i++ {
+-   field := userType.Field(i)
+-   jsonTag := field.Tag.Get("json")
+-   dbTag := field.Tag.Get("db")
+-   fmt.Printf("Field %s: json='%s', db='%s'\n", field.Name, jsonTag, dbTag)
+- }
+
+~ The JSON marshaling process illustrates how struct tags provide declarative control overserialization without requiring imperative code or custom serialization methods. The json.Marshal() function automatically reads and interprets the JSON tags, applying the specified transformations and exclusions to produce JSON that conforms to external API expectations while keeping the Go struct fields named according to Go conventions. The reflection section demonstrates Go's runtime type inspection capabilities, using reflect.TypeOf() to examine the metadata programmatically. The code iterates through each field using NumField() and Field() methods, then extracts specific tag values using Tag.Get() for both json and db tags.
+
+! Different ways to create structs
+- var p1 Person                           // Zero value initialization
+- p2 := Person{}                          // Empty initialization
+- p3 := Person{"Alice", 30, "New York"}   // Positional initialization
+- p4 := Person{                           // Named field initialization
+-   Name: "Bob",
+-   Age: 25,
+-   City: "Boston",
+- }
+
+! Inline anonymous struct
+- settings := struct {
+-   Theme string
+-   Language string
+-   Debug bool
+- }{
+-   Theme: "dark",
+-   Language: "en",
+-   Debug: true,
+- }
+
+! Anonymous struct in slice
+- people := []struct {
+-   Name string
+-   Role string
+- }{
+-   {"Alice", "Developer"},
+-   {"Bob", "Designer"},
+-   {"Charlie", "Manager"},
+- }
+
+
+!! Pointers:
+Pointers are fundamental feature in Go that allow you to directly reference and manipulate memory locations.
+
+- func main() {
+-   x := 10
+#   // Pass the address of x to the function
+-   updateValue(&x)
+- }
+#   Takes a pointer to an int as an argument
+- func updateValue(ptr *int) {
+-   *ptr = *ptr + 5 // Dereference the pointer and modify the value
+- }
+~ The key operation occurs when the code passes &x to the updateValue() function, where the ampersand operator & retrieves the memory address of variable x rather than its value. The updateValue() function accepts a parameter ptr of type *int, which is a pointer type that can hold the memory address of an integer variable. Inside the updateValue() function, the code uses the dereference operator * twice in the expression *ptr = *ptr + 5.
+
+
+x The second example is about creating a linked list in Go. In this example, pointers to structures are also illustrated. The program begins by defining the foundation of a singly linked list using structures.
+% (linkedList.go)
+
+- The Insert() method appends a new node to the end of the list. It first creates a new node using the given value. If the list is empty (i.e., Head is nil), the new node becomes the head of the list. Otherwise, the method traverses the list by iterating through each node until it reaches the last node — identified when current.Next is nil. At that point, it links the new node by setting the Next field of the last node to point to it, effectively extending the list.
+
+- The Delete() method removes the first occurrence of a node that matches the given value. It begins by checking if the list is empty; if so, there is nothing to delete. If the head node contains the target value, the head is simply moved to the next node, effectively removing the first element. Otherwise, the function uses two pointers: prev to track the previous node and curr to scan the list. As it traverses, if it finds a node where curr.Value equals the target value, it bypasses the node by setting prev.Next = curr.Next, effectively unlinking it from the list. If the value is not found, the traversal continues until the end.
+
+- The Sort() method arranges the list values in ascending order using the bubble sort algorithm. It starts by checking if the list is empty or contains only one element; in either case, no sorting is needed, so the function returns early. Otherwise, it enters a loop controlled by the swapped flag, which tracks whether any swaps occurred in a pass. Inside the loop, it iterates through the list from the head node, comparing each node's value with the value of the next node. If the current node value is greater than the next node's, the two values are swapped, and the swapped flag is set to true. This process continues until a complete pass occurs with no swaps, meaning the list is fully sorted.
+
+- The Print() method displays the contents of the list in a readable format. It starts from the head node and traverses the list sequentially, printing each node's value followed by " -> " to represent the link to the next node. When it reaches the end of the list (current becomes nil), it prints "nil" to indicate termination.
+
+!! Summary:
+!! In this chapter, we explored four essential building blocks of Go programming: maps, structures, functions, and pointers. Pointers provide precise memory control and reference semantics. Maps give us a way to store and retrieve data using keys, enabling fast lookups and flexible data organization. Structures allow us to design custom types that group related fields together, making our programs more expressive and easier to manage. Functions provide the foundation for organizing logic, reusing code, and building abstractions that keep programs modular and maintainable.
+
+
+
+! ------------------------------------------------------CHAPTER 3--------------------------------------------------------------
