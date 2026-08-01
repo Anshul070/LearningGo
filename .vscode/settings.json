@@ -32,7 +32,8 @@
             // %
             "scope": "source.note string",
             "settings": {
-                "foreground": "#E6DB74"
+                "foreground": "#E6DB74",
+                "fontStyle": "bold"
             }
         },
         {
@@ -47,14 +48,14 @@
             "scope": "source.note variable.parameter",
             "settings": {
                 "foreground": "#FD971F",
-                "fontStyle": ""
             }
         },
         {
             // ?
             "scope": "source.note support.function",
             "settings": {
-                "foreground": "#66D9EF"
+                "foreground": "#03CEA4",
+                "fontStyle": "bold underline"
             }
         },
         {
@@ -68,7 +69,8 @@
             // !
             "scope": "source.note keyword",
             "settings": {
-                "foreground": "#F92672"
+                "foreground": "#FEEAFF",
+                "fontStyle": "bold"
             }
         },
         {

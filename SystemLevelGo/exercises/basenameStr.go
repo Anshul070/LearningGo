@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func basename(path string, extention ...string) (string) {
+func basenameStr(path string, extention ...string) (string) {
 	if path == "/" {
 		return path
 	} 

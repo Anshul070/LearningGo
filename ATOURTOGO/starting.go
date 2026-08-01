@@ -961,6 +961,11 @@ func bufferChannelDemo() {
 // v, ok := <-ch
 // ok is false if there are no more values to receive and the channel is closed.
 // Note: Only the sender should close a channel, never the receiver. Sending on a closed channel will cause a panic.
+// If we want to pass a read only channel or write only channel to a function we can use this while declaring function parameters:
+// Read-only
+// ch <-chan string
+// Write-only
+// ch chan<- string
 
 func fibonacciClose(n int, c chan int) {
 	x, y := 0, 1
