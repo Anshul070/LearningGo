@@ -26,18 +26,18 @@ func TextStreamer(streamText string, stream chan<- string) {
 	}
 }
 
-func TextReceiver(stream <- chan string, done chan bool){
+func TextReceiver(stream <- chan string, done chan struct{}){
 	for txt := range stream {
 		fmt.Printf(txt)
 	}
-	done <- true
+	done <- struct{}{}
 }
 
 func main() {
 	streamText := "Our minds are inherently concurrent. At any moment, we juggle memory, intention, perception, and action - parallel processes that somehow compose a unified experience. Writing software that behaves in the same way is deceptively difficult. This chapter explored the essence of concurrent programming in Go by cultivating a mindset of coordination, isolation, and communication. In doing so, we learn to write programs that not only run faster but also operate in harmony with the world around them."
 
 	stream := make(chan string)
-	done := make(chan bool)
+	done := make(chan struct{})
 
 	go TextStreamer(streamText, stream)
 	go TextReceiver(stream, done)
