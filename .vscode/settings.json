@@ -47,7 +47,8 @@
             // -
             "scope": "source.note variable.parameter",
             "settings": {
-                "foreground": "#FD971F",
+                "foreground": "#FFDDFF",
+                "fontStyle": "bold"
             }
         },
         {
@@ -69,7 +70,7 @@
             // !
             "scope": "source.note keyword",
             "settings": {
-                "foreground": "#FEEAFF",
+                "foreground": "#AAFFFF",
                 "fontStyle": "bold"
             }
         },
@@ -79,6 +80,14 @@
             "settings": {
                 "foreground": "#F92672",
                 "fontStyle": "bold underline"
+            }
+        },
+        {
+            // !!
+            "scope": "source.note ",
+            "settings": {
+                "foreground": "#FEFFEA",
+                "fontStyle": ""
             }
         }
     ]
