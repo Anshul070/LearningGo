@@ -1,0 +1,26 @@
+goos: windows
+goarch: amd64
+pkg: reverseStr
+cpu: AMD Ryzen 7 7435HS                             
+BenchmarkByteReverse-16    	 1810522	       659.6 ns/op
+BenchmarkByteReverse-16    	 1830148	       666.0 ns/op
+BenchmarkByteReverse-16    	 1640028	      1109 ns/op
+BenchmarkByteReverse-16    	 1000000	      1382 ns/op
+BenchmarkByteReverse-16    	 1423640	       713.5 ns/op
+BenchmarkByteReverse-16    	 1778932	      1340 ns/op
+BenchmarkByteReverse-16    	  744721	      2195 ns/op
+BenchmarkByteReverse-16    	  537363	      2774 ns/op
+BenchmarkByteReverse-16    	 1349570	       854.5 ns/op
+BenchmarkByteReverse-16    	 1687131	       665.1 ns/op
+BenchmarkRuneReverse-16    	  225438	      6973 ns/op
+BenchmarkRuneReverse-16    	  108578	     18270 ns/op
+BenchmarkRuneReverse-16    	  179719	     14302 ns/op
+BenchmarkRuneReverse-16    	  222871	     13141 ns/op
+BenchmarkRuneReverse-16    	   83146	     15339 ns/op
+BenchmarkRuneReverse-16    	  135576	     15229 ns/op
+BenchmarkRuneReverse-16    	   91040	     16040 ns/op
+BenchmarkRuneReverse-16    	  108655	     12067 ns/op
+BenchmarkRuneReverse-16    	   81302	     14050 ns/op
+BenchmarkRuneReverse-16    	   65475	     17776 ns/op
+PASS
+ok  	reverseStr	47.206s

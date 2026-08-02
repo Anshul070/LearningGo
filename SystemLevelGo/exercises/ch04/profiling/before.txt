@@ -1,0 +1,16 @@
+goos: windows
+goarch: amd64
+pkg: progiling
+cpu: AMD Ryzen 7 7435HS                             
+BenchmarkPrime-16    	       7	 153686586 ns/op
+BenchmarkPrime-16    	       7	 150603400 ns/op
+BenchmarkPrime-16    	       8	 143406575 ns/op
+BenchmarkPrime-16    	       8	 145575600 ns/op
+BenchmarkPrime-16    	       8	 141994488 ns/op
+BenchmarkPrime-16    	       8	 138378625 ns/op
+BenchmarkPrime-16    	       8	 136142362 ns/op
+BenchmarkPrime-16    	       8	 142459062 ns/op
+BenchmarkPrime-16    	       8	 139010388 ns/op
+BenchmarkPrime-16    	       8	 138297000 ns/op
+PASS
+ok  	progiling	14.818s

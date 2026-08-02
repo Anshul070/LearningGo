@@ -1003,3 +1003,33 @@ What is important is to understand that PGO requires a representative workload d
 - Reflection
 - synctest
 - BenchMarking
+
+? Exercises: 
+% FIRSET :- Create two different functions that reverse a string: one using []rune and one using byte manipulation. Now compare their performance.
+    - (go test -bench=. -run=^$) Run only benchmarks (skipping unit tests)
+    - (go test -bench=. -benchmem) See memory allocations
+    - (go test -bench=. -count=10 > before.txt) Run multiple iterations (for stable benchstat data)
+
+% Second :- Extend the Shape interface example by adding a Triangle type. Implement its Area() and Perimeter() methods and verify that it works with the printShapeInfo() function.
+
+% Create tests for ch04/basename.go by comparing the output of basename() with the output the filepath.Base() function of the Standard Library.
+    - t.Run() it runs this on goroutine and used to run test inside test.
+ 
+% Create a generic Max() function that returns the maximum value from a slice of numeric types. Test it with []int, []float64, and []uint.
+
+% Write a program that allocates a large slice of integers inside a loop. Run the program with different values of GOGC (10, 100, 200) and record how HeapAlloc and NumGC change. Explain what you observe.
+    - chunk := make([]byte, 50<<20) shifts 50 integer to left 20 bits; Shifting 1 integer left by 20 bits multiplies it by 2²⁰ which is exactly 1,048,576 (1 Mebibyte / Megabyte in computing). (50 × 1,048,576 = 52,428,800 bytes. = 50MB)
+
+% Write a program that generates prime numbers up to a large n. Enable CPU profiling and heap profiling using the pprof package and analyze where most time and memory are spent.
+    - var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+    - flag.Parse()
+
+	- if *cpuprofile != "" {
+	-  	f, err := os.Create(*cpuprofile);
+	-	if err != nil {
+	-		log.Fatal(err)
+	-	}
+	-	defer f.Close()
+	-	defer pprof.StopCPUProfile()
+	-	pprof.StartCPUProfile(f)
+	- }
