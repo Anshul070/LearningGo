@@ -998,11 +998,11 @@ What is important is to understand that PGO requires a representative workload d
 ! In this chapter I have learned about Execution Process, Garbage Collector(GC), Memory Leaks (Pointer/refrence and Goroutines), The go schedular (GMP), GOMAXPROCS, Profile Guiding Optimization (PGO), (make and new), Workspaces, Interfaces, Reflection, Generics, Package and module, Testing, synctest package, dates and times, Bechmarking, Profile Application (PGO)
 
 !! Not Clear:
-- PGO
+- PGO [X]
 - Workspaces
 - Reflection
 - synctest
-- BenchMarking
+- BenchMarking [X]
 
 ? Exercises: 
 % FIRSET :- Create two different functions that reverse a string: one using []rune and one using byte manipulation. Now compare their performance.
@@ -1033,3 +1033,268 @@ What is important is to understand that PGO requires a representative workload d
 	-	defer pprof.StopCPUProfile()
 	-	pprof.StartCPUProfile(f)
 	- }
+
+
+!! ------------------------------------------------------CHAPTER 5------------------------------------------------------------
+
+!! Working with File I/O
+These play a key role in many Go applications, from reading configuration files to processing large datasets.The os, io, and bufio packages of the Go standard library provide robust tools for creating, reading, writing, and manipulating files efficiently. Whether you are dealing with text, binary data, or structured formats such as JSON or CSV, the simplicity and performance of Go make file operations straightforward.
+
+In Go, byte slices ([]byte) are the fundamental building blocks for file I/O operations. Whenever you read from or write to a file, the data is handled in terms of bytes, and slices provide a flexible container for that data.
+- os.ReadFile() return the entire file contents as a []byte byte slice
+- File.Read() and File.Write() operate on slices provided by you.
+
+! This chapter covers the following main topics:
+- Reading files
+- Writing files
+- Buffered and unbuffered file I/O operations
+- Logging in Go
+- Copying files
+- Implementing wc(1)
+
+!! stdin, stdout, and stderr
+Unix uses file descriptors, which are positive integer values, as an internal representation for accessing open files. This is much prettier than using long paths. By default, all Unix systems support three special and standard filenames: /dev/stdin, /dev/stdout, and /dev/stderr, which can also be accessed using 0, 1, and 2 file descriptors, respectively. These three file descriptors are also called standard input, standard output, and standard error, respectively. Go uses os.Stdin for accessing standard input, os.Stdout for accessing standard output, and os.Stderr for accessing standard error. Although you can still use /dev/stdin, /dev/stdout, and /dev/stderr, it is safer and more portable to stick with os.Stdin, os.Stdout, and os.Stderr.
+
+!! Checking whether a file path exists
+Before reading, writing, or modifying a file, it is often necessary to verify that the given path points to a valid file or directory.
+% (ch05/doesItExist.go) which determines whether a given filesystem path exists and reports the result to the user
+    - The code calls os.Stat(), which attempts to retrieve information about the file or directory at the specified path. If os.Stat() succeeds without error, the program concludes that the path exists and prints a confirmation message.
+    - If the function returns an error, the program checks whether the error is of type fs.ErrNotExist using errors.Is(). In that case, it clearly reports that the path does not exist.
+    - For any other type of error – such as insufficient permissions or unexpected I/O issues – the program writes an error message to standard error and exits with a nonzero status code.
+
+% Execute (go run ch05/doesItExist.go "D:\Learnings\Learning GO\SystemLevelGo\exercises") 
+    - If the path exists it will give the output (Path <path> exists.)
+    - If path does not exists it will give the output (Path <path> does not exist.)
+    - If there is any other reason it will give the output ("Error checking path: <error>")
+
+!! Reading files
+For simple cases where you want the entire content at once, os.ReadFile() is the most convenient choice, returning the file contents as a byte slice. For streaming access, os.Open() combined with a bufio.Scanner instance lets you iterate line by line or even word by word, making it memory-efficient for large files. If you need lower-level control, bufio.NewReader() provides methods such as ReadBytes(), ReadString(), or ReadRune() for fine-grained reading.
+
+% (ch05/readFile.go) demonstrates the simplest way to read the contents of a file in Go
+    - The code uses os.ReadFile() to load the entire contents of the specified file into memory. The os.ReadFile() function is a convenience function in the Go standard library that handles opening the file, reading all its data into a byte slice, and then closing the file automatically. If an error occurs, the error is reported, and the program exits. Once the file data is successfully read, we print its length.
+
+! Although this approach is straightforward and efficient for small to medium-sized files, a streaming approach may be preferable to avoid high memory usage when dealing with very large files. Additionally, although os.Stat() is useful for checking file properties, it does not give access to the file's data. The os.ReadFile() function is the right choice when you need the actual file data. If the file path does not exist, then os.ReadFile() will find that out, just as os.Stat() did.
+
+% Execute (go run ch05/readFile.go README.md)
+    - Output (Read README.md: 963 bytes)
+
+? If you try go run ch05/readFile.go ch05/readFile.go, the command will fail because Go interprets the second ch05/readFile.go as another source file to compile, not as a command-line argument for your program. In that case, you should go build your source code file first and use the binary executable.
+
+!! File seeking
+File seeking allows you to move the read or write cursor within an open file, giving you precise control over where data is accessed so that you can access just the parts you need. This is particularly useful for tasks such as resuming partial downloads, reading specific sections of large files, or updating records in place. Go provides this functionality through the Seek() method on *os.File, which takes an offset and a whence argument (io.SeekStart, io.SeekCurrent, or io.SeekEnd) to specify the reference point for the offset. For example, file.Seek(0, io.SeekStart) positions the cursor at the beginning of the file, while file.Seek(-10, io.SeekEnd) moves it 10 bytes before the end. When combined with functions such as Read() or ReadAt(), seeking gives you random-access capabilities that go beyond simple sequential reading.
+
+% The example code of seekAndRead() as found in (ch05/fseek.go) It demonstrates how to open a file, move the read pointer to a specific offset, and then read a given number of bytes
+    - The code begins by opening the file using os.Open(), and if this fails, it returns an error wrappedwith context. With the file safely opened, it uses f.Seek(offset, io.SeekStart) to move theread pointer to the desired offset, where 0 indicates that the offset is measured from the beginning of the file. Next, it allocates a buf byte slice of the requested length and attempts toread data into it using f.Read(). The function then handles any read errors, making sure to allow EOF as a non-fatal condition, and finally returns the slice of bytes actually read.
+
+! Observe how os.Open() and os.ReadFile() serve different purposes in Go, even though both are used to work with files. The os.Open() function opens a file and returns a file descriptor (*os.File), which you can then use for operations such as reading chunks of data, seeking within the file, or streaming large files. It gives you fine-grained control over how the file is accessed, making it suitable for very large files where you do not want to load everything into memory. The os.ReadFile() function, on the other hand, is a convenience function that opens the fileinternally, reads its entire contents into memory as a byte slice, and then closes the file for you.This makes os.ReadFile() simpler to use when dealing with small to medium-sized files, where you just need the full contents at once; it is less efficient or even impractical for very large files.
+
+% Execute (go run ch05/fseek.go ../Notes.txt 1003 12)
+    - The ouptut will be (Read 12 bytes from offset 1003: benchmarkin)
+
+
+!! Unbuffered reading
+Unbuffered reading in Go refers to reading data directly from an input source, such as a file, network connection, or standard input, without the use of an intermediate buffer.While unbuffered reading provides the simplest and most direct way to access data, it can be less efficient for highthroughput scenarios (because it involves more frequent system calls) and can increase latency. This approach gives you fine-grained control and is useful when you want to process binary data, partial records at a time, or when working with custom buffering strategies.
+
+% code snippet from ch05/unbufRead.go demonstrates unbuffered file reading in small chunks and illustrates how raw bytes can be processed as they are read.
+    - A slice of 16 bytes is created with make([]byte, 16), which acts as a temporary buffer for each read operation. Inside the loop, the call to file.Read(buffer) attempts to fill the slice with data from the file and returns the number of bytes actually read (n). If any bytes are read, byteCount is incremented, and for the first 50 iterations, the program inspects the first byte of the buffer to print arepresentation of it. Special handling is included: newline characters are shown as \n, tabs as \t, and non-printable or out-of-ASCII-range bytes are replaced with a dot. Otherwise, the character itself is printed. The loop continues until an error occurs (typically io.EOF, meaning the end of the file), at which point the loop breaks.
+
+% Execute (go run ch05/unbufRead.go ../Notes.txt)
+    - Output:
+
+    - Reading file '../Notes.txt' using unbuffered I/O:
+    - Reading byte by byte...
+    - ! NH\n \n----P----- icxABacepae  oefeiTcllcekbdthhgo...
+    - Total bytes read: 8396
+
+
+!! Buffered reading
+Buffered reading in Go involves reading data through an intermediate buffer, which temporarily stores chunks of data from the input source before the program processes it. This technique reduces the number of direct read operations on the underlying source by fetching larger blocks of data at once, improving efficiency and performance – especially when dealing with slow or costly I/O such as disk files or network streams. The Go standard library provides convenient tools such as bufio.Reader that handle buffering transparently, letting you read data in smaller pieces while benefiting from fewer system calls.
+
+- This makes buffered reading the preferred choice when working with text files or line-by-line processing, as it reduces overhead and provides higher-level abstractions.
+- While unbuffered reading is more suitable for low-level or performance-sensitive tasks where control over the exact read size matters.
+
+x The bufio.Reader tool defaults to an internal 4 KB buffer because this size strikes a balance between memory usagand system call efficiency. On most modern operating systems, disk and filesystem blocks artypically multiples of 4 KB, so aligning the buffer size with this block size reduces wasted readand allows efficient interaction with the OS page cache. If you want a different size (say a 16 Kbuffer), then you can write reader := bufio.NewReaderSize(file, 16*1024).
+
+% (ch05/bufRead.go) shows how to use buffered I/O with the bufio package.
+    - A bufio.NewReader(file) instance is created with the default buffer size of 4 KB. Inside the loop, the program calls reader.ReadByte(), which retrieves a single byte from the internal buffer. 
+    - Only when the buffer runs out does ReadByte() trigger a system call to refill it, making it far more efficient than calling file.Read() for each byte. The byteCount and readOperations counters
+    - track how many bytes and read operations have been performed. As before, the first 50 bytes are printed, with special formatting for newlines (\n), tabs (\t), and non-printable characters (shown as a dot).
+
+% Execute (go run ch05/bufRead.go ../Notes.txt);
+    - Reading file '../Notes.txt' using buffered I/O:
+    - Using bufio.Reader with internal buffer...
+    - !   CHAPTER.\n!!  Topics.\n-   POINTS.\nx   HIGHLIGHT...
+    - 
+    - Total bytes read: 136648
+    - Buffer size used: 4096 bytes
+
+
+!! Benchmarking buffered and unbuffered reading
+Benchmarking buffered and unbuffered reading to compare their performance characteristics.
+% The benchmarks can be found in (ch05/reading_test.go), which creates a file at (/tmp/largefile.txt) for testing purposes
+    - goos: windows
+    - goarch: amd64
+    - cpu: AMD Ryzen 7 7435HS                             
+    - BenchmarkUnbufferedRead-16             5         239810200 ns/op
+    - BenchmarkBufferedRead-16            2397            497278 ns/op
+    - PASS
+    ! ok      command-line-arguments  4.017s
+
+    - BenchmarkUnbufferedRead-16: Takes 239.81 milliseconds (239,810,200 ns) per operation. It only completed 5 iterations in the default benchmark time window.
+    - BenchmarkBufferedRead-16: Takes 0.49 milliseconds (497,278 ns) per operation. It successfully completed 2,397 iterations in the same time window.
+
+
+!! Profiling buffered and unbuffered reading
+Usinge the runtime/pprof package, we can capture detailed information about function call frequency, allocation patterns, and system interactions.
+
+% The relevant program (ch05/profReading.go)
+    -  It begins by creating a file named cpu.prof where CPU profiling data will be written. The call to pprof.StartCPUProfile(f) activates CPU profiling, which records where the program spends time during execution, and the deferred call to pprof.StopCPUProfile() ensures that profiling stops and data is flushed when the program ends. You place the code you want to profile between these two calls. Unlike CPU profiling, memory profiling does not require starting and stopping a session with dedicated function calls. Go runtime is always tracking memory allocations in the background. To capture this information, you simply call pprof.WriteHeapProfile(), which writes the current heap statistics to the provided file, which must be created beforehand, such as cpu.prof. It is common to call runtime.GC() just before writing the profile to ensure that the data reflects the most recent state of the program. So, while CPU profiling requires actively starting and stopping, memory profiling is always on and only needs to be dumped at the right time using WriteHeapProfile().
+    -   The readUnbuffered() function creates a single-byte buffer using make([]byte, 1) and calls file.Read(buffer) for every individual byte in the file. This approach means that for a 1 MB file, the function makes approximately 1 million separate system calls to the operating system kernel, with each call requesting just 1 byte of data. Every system call involves expensive context switching between user space and kernel space, along with the overhead of the kernel's filesystem operations, making this approach extremely inefficient despite its conceptual simplicity. In contrast, the readBuffered() function uses bufio.NewReader(file) to create a buffered reader that internally maintains a 4 KB buffer by default. When reader.ReadByte() is called, the buffered reader serves the byte from its internal memory buffer, only making system calls when the buffer needs to be refilled from the file. For the same 1 MB file, this approach might make only around 250 system calls (1 MB divided by 4 KB), dramatically reducing expensive kernel interactions while providing the same byte-by-byte interface to the application.
+    - The function begins by creating a new file using os.Create(), which truncates any existing file with the same name, then immediately defers its closure to ensure proper resource cleanup. It wraps the file with a bufio.NewWriter instance to employ buffered writing, which is crucial for performance when writing many small pieces of data, and defers the Flush() call to guarantee that any data remaining in the buffer is written to disk before the function exits. The core operation uses a simple but effective approach: it repeatedly writes a fixed text pattern until the desired file size is reached. The function tracks bytesWritten() to ensure precise size control, accumulating the return value from each WriteString() call, which reports how many bytes were written. Besides its utility for file creation, this function serves as a handy tool for performance analysis and educational demonstrations. By generating files of controlled sizes (1 KB, 1 MB, 10 MB, etc.), developers can systematically study how I/O performance scales with file size and observe dramatic differences between buffered and unbuffered operations across various scenarios. The function itself exemplifies good, buffered writing practices, using bufio.NewWriter instead of writing directly to the file, which would be inefficient for the many small WriteString() operations. You will learn about writing operations in the Writing files section.
+
+% Execute these commands :
+    - go run ch05/profReading.go -generate=100MB # create file
+    - go run ch05/profReading.go -file=/tmp/sample_custom_100MB.txt -cpuprofile=cpu.prof -memprofile=mem.prof # get profile data
+    - go tool pprof cpu.prof
+
+    -   D:\Learnings\Learning GO\SystemLevelGo\goSP\ch05\profReading>go tool pprof cpu.prof
+    -   File: profReading.exe
+    -   Build ID: C:\Users\saini\AppData\Local\go-build\67\67cfb973c1928bcb65296c8613ddb1f0bdb57b58348e7e7e12c5b147e221d904-d\profReading   .-    exe2026-08-04 01:37:29.0152347 +0530 IST
+    -   Type: cpu
+    -   Time: 2026-08-04 01:39:32 IST
+    -   Duration: 149.27s, Total samples = 145.96s (97.78%)
+    -   Entering interactive mode (type "help" for commands, "o" for options)
+    -   (pprof) top
+    -   Showing nodes accounting for 144.41s, 98.94% of 145.96s total
+    -   Dropped 72 nodes (cum <= 0.73s)
+    -   Showing top 10 nodes out of 23
+    -         flat  flat%   sum%        cum   cum%
+    -      143.10s 98.04% 98.04%    143.31s 98.18%  runtime.cgocall
+    -        1.06s  0.73% 98.77%      1.06s  0.73%  runtime.semawakeup
+    -        0.06s 0.041% 98.81%    143.60s 98.38%  internal/poll.(*FD).Read
+    -        0.05s 0.034% 98.84%      0.80s  0.55%  runtime.systemstack
+    -        0.04s 0.027% 98.87%    143.66s 98.42%  os.(*File).Read
+    -        0.03s 0.021% 98.89%    143.51s 98.32%  internal/poll.(*FD).execIO
+    -        0.02s 0.014% 98.90%    143.35s 98.21%  internal/poll.(*FD).Read.func1
+    -        0.02s 0.014% 98.92%    143.33s 98.20%  syscall.readFile
+    -        0.02s 0.014% 98.93%    143.33s 98.20%  syscall.syscalln
+    -        0.01s 0.0069% 98.94%    143.62s 98.40%  main.readUnbuffered
+
+    ! The Core Meaning of This ChartYour program ran for 149 seconds, and for 143 of those seconds (98%), it did zero actual work. Instead, it was completely stuck in a loop of knocking on Windows' door to ask for data byte-by-byte.
+    ! flat (143.10s): The exact time spent directly executing code inside that specific function. runtime.cgocall is your absolute bottleneck because its flat time is huge.
+    ! flat% (98.04%): Out of all the CPU data collected, 98.04% of it caught the CPU stuck inside runtime.cgocall.
+    ! sum% (98.04% -> 98.77%): A running total checklist. The first two functions alone account for 98.77% of your total performance loss.
+    ! cum (143.62s): Cumulative time. This is the total time spent inside a function plus all the other steps it triggers. main.readUnbuffered has a tiny flat time (0.01s) but a massive cum time (143.62s) because it kicked off the whole slow chain.
+
+    - (pprof) peek main.readBuffered  
+    - Showing nodes accounting for 145.96s, 100% of 145.96s total
+    - ----------------------------------------------------------+-------------
+    -       flat  flat%   sum%        cum   cum%   calls calls% + context              
+    - ----------------------------------------------------------+-------------
+    -                                              0.26s   100% |   main.runBothProfiling
+    -      0.02s 0.014% 0.014%      0.26s  0.18%                | main.readBuffered
+    -                                              0.24s 92.31% |   bufio.(*Reader).ReadByte
+    - ----------------------------------------------------------+-------------
+    ! peek main.readBufferedThis chart looks at your fast, buffered reading function.
+    ! The Caller (Top): main.runBothProfiling called this function. Out of all the time spent inside readBuffered (0.26 seconds), 100% of it came from this caller.
+    ! The Target (Middle): main.readBuffered took a total cumulative time of 0.26s (only 0.18% of your entire program's runtime). It spent almost no time processing code inside its own body (flat = 0.02s).
+    ! The Child Call (Bottom): It spent 0.24s (92.31% of its time) calling bufio.(*Reader).ReadByte. This proves the function spent its time pulling bytes out of fast RAM memory buffers instead of talking to Windows.
+
+    - (pprof) peek main.readUnbuffered
+    - Showing nodes accounting for 145.96s, 100% of 145.96s total
+    - ----------------------------------------------------------+-------------
+    -       flat  flat%   sum%        cum   cum%   calls calls% + context              
+    - ----------------------------------------------------------+-------------
+    -                                            143.62s   100% |   main.runBothProfiling
+    -      0.01s 0.0069% 0.0069%    143.62s 98.40%                | main.readUnbuffered
+    -                                            143.61s   100% |   os.(*File).Read
+    - ----------------------------------------------------------+-------------
+    ! peek main.readUnbufferedThis chart looks at your slow, unbuffered reading function.
+    ! The Caller (Top): main.runBothProfiling called this function too. It handed over a massive 143.62s of work to it.
+    ! The Target (Middle): main.readUnbuffered took a total cumulative time of 143.62s (which is 98.40% of your entire program's runtime). Its internal logic itself took almost no time (flat = 0.01s).
+    ! The Child Call (Bottom): It spent 143.61s (100% of its time) calling os.(*File).Read. This proves that your function is entirely bottlenecked by passing the workload down to the standard operating system disk-reading layer.
+
+
+!! Reading a file line by line
+Reading a file line by line is one of the most common patterns when processing text data, as it allows programs to handle files of arbitrary size without loading the entire content into memory. In Go, this is typically achieved using bufio.Scanner. Its default split function (ScanLines()) is configured to split input on newlines, abstracting away the low-level details of detecting line endings.
+
+% The functionality can be found in (ch05/lineByLine.go)
+    - The function reads a plain text file line by line and returns its contents as a slice of strings. It begins by opening the file specified by the filename argument using os.Open(), and if that fails, then the function immediately returns with an error. A defer file.Close() statement ensures that the file is properly closed once the function completes, preventing resource leaks. It then initializes a bufio.Scanner instance to read the file line by line. Inside a loop, each line is read with scanner.Scan() and appended to the lines slice using scanner.Text(). After reading all lines, the function checks for scanning errors via scanner.Err(), returning an error if one occurs. If no errors are encountered, the function returns the accumulated slice of lines and a nil error.
+
+
+!! Reading a file word by word
+Sometimes it is necessary to process a file at the word level rather than line by line, for example, in tasks such as text analysis, word frequency counting, or parsing structured input where individual tokens matter. The bufio.Scanner utility supports this word-level processing via the ScanWords split function, which tokenizes the input on whitespace boundaries.
+
+% Look at the (ch05/wordByWord.go) file;
+    - The readWords() function reads the contents of a text file and returns them as a slice of words. The function uses a bufio.Scanner instance to process the file content and configures it with scanner.Split(bufio.ScanWords), which instructs the scanner to break the input into words instead of lines (bufio.ScanLines). Inside a loop, each word is appended to the words slice. When scanning is complete, the function checks, with scanner.Err(), for any errors that may have occurred during scanning. If no errors are encountered, it returns the full slice of words and a nil error.
+
+
+!! Reading a file character by character
+For certain applications, such as lexical analysis, syntax parsing, or fine-grained text processing, reading a file character by character is essential. In Go, this can be achieved using bufio.Reader with ReadRune(), which properly handles Unicode characters while giving precise control over each character read. This method allows programs to inspect, transform, or validate text at the smallest meaningful unit, supporting tasks that require detailed parsing or incremental processing of both ASCII and non-ASCII content.
+
+% The code is inside (ch05/charByChar.go)
+    - The readChars() function reads a text file character by character and returns its contents as a slice of runes. It takes an already opened *os.File instance as input and wraps it in a bufio.NewReader() function, which provides buffered reading for efficiency. Inside an infinite loop, it calls reader.ReadRune(), which reads the next UTF-8 encoded character from the file and returns it as a rune. If an error occurs, the function checks whether it is io.EOF, which signals the end of the file; in that case, the loop breaks cleanly. Any other error is returned immediately. Each successfully read rune is appended to the chars slice, ensuring that multi-byte characters are handled correctly.
+    - The main() function provides a simple entry point for reading characters from either a file or standard input. It begins by checking whether a filename has been provided as a command-line argument. If a filename is given, the program attempts to open the file, handling any errors by printing an appropriate message to standard error and exiting. A defer input.Close() function ensures that the file is properly closed after use. If no filename is provided, the program defaults to reading from standard input, making it flexible enough to handle both files and piped input. Once the input source is determined, it calls readChars() to extract the contents as a slice of runes. Any error during this step is reported and causes the program to terminate. Finally, the program loops through the characters, printing each one along with its position.
+
+
+!! Writing files :
+Writing files is a fundamental operation in Go that allows programs to store data permanently on disk. By choosing the right file-opening modes, you can control whether you overwrite existing content, append new data, or create files only if they do not already exist. Once you have a file handle, you can write data with methods such as f.Write(), which accepts a byte slice, or f.WriteString(), which accepts a string directly. For more efficient output, the bufio.NewWriter() type can wrap a file handle and perform buffer writes before flushing them with w.Flush().
+
+!! Creating new files:
+Creating new file in Go is straightforward using functions such as os.Create() and os.OpenFile() that not only generate a file on disk but also return a file descriptor for immediate writing operations.
+
+% (ch05/create.go) shows how to create empty files
+    - The core file operation uses os.Create(filename), which is a wrapper around the lower-level os.OpenFile() function with O_RDWR|O_CREATE|O_TRUNC flags. This system call either creates a new file or truncates an existing file to 0 bytes, effectively overriding any existing content while maintaining the same inode (a data structure that describes a filesystem object, such as a file or a directory). The function returns both a file pointer and an error value, where the error is checked immediately after the operation. If file creation fails due to permissions, disk space, or other filesystem issues, the program prints an error message and exits with code 1. The program immediately closes the file using file.Close(), since the goal is to create an empty file rather than write data, and since proper resource management requires explicit closure of file descriptors to avoid resource leaks. After closure, the program performs an os.Stat() call to retrieve filesystem metadata about the newly created file. Finally, the program provides user feedback by displaying the filename, file size (which should be 0 bytes for an empty file), and file permissions in their string representation format, confirming successful completion of the file creation operation, and providing verification that the file exists in the expected state.
+
+% Run (gu run ch05/create.go <dirpath>/<filenam.txt>)
+
+
+!! Creating a file if it does not exist
+When working with files in Go, you may often want to create a new file, but only if it does not already exist. This prevents overwriting valuable data by mistake and ensures your program behaves predictably in environments where files may already be present. The os.OpenFile() function provides the necessary control through specific flags that let you enforce exclusive creation.By combining these flags with proper error handling, you can build safe and reliable file operations that only write new data when the target file was previously absent.
+
+- Such As :
+    ! // os.O_CREATE: create file if not exists
+    ! // os.O_EXCL: fail if file already exists
+    ! // os.O_WRONLY: open for writing
+    ! os.OpenFile(fn, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+
+% Look at the (ch05/newFile.go) file
+    - The code defines the file path as /tmp/unique.txt and uses os.OpenFile() with a combination of flags: os.O_CREATE instructs Go to create the file if it is missing, os.O_EXCL forces the operation to fail if the file already exists, and os.O_WRONLY opens the file in write-only mode. Together, these flags ensure that the program will never overwrite an existing file. If the file already exists, the error is caught with os.IsExist(err) and a message is printed without modifying the file. If another error occurs, it is reported, and the program exits. When the file is created successfully, the program writes a short message into it using f.WriteString() and then confirms creation with a success message. The defer f.Close() statement guarantees that the file is properly closed before the program terminates.
+
+% Run (go run ch05/newFile.go)
+    - The first time you run the program, it successfully creates the /tmp/unique.txt file because the file does not yet exist. On the second run, however, the file is already present in /tmp, so the os.O_EXCL flag prevents the file from being overwritten or truncated. This approach is a standard defensive programming pattern that ensures that the process of checking for a file and creating it happens as a single operation.
+
+
+!! Appending to files
+Appending to a file means adding new data to the end of an existing file without overwriting its current contents.
+
+% The (ch05/append.go) utility demonstrates how to append text to a file in Go using input from command-line arguments.
+    - The code begins by checking that at least two arguments are provided: the filename and the text to append. If not, it prints usage instructions and then exits. The filename is taken from the first argument, while the remaining arguments are joined into a single string of text, followed by a newline to ensure proper formatting. The program then opens the target file with os.OpenFile() using the os.O_APPEND, os.O_CREATE, and os.O_WRONLY flags, which together mean append new content to the file if it exists, create it if it does not, and open it for writing. If an error occurs at this stage, the program prints the error and exits. Once the file is successfully opened, it defers closing the file to release resources properly. It then writes the given text with WriteString(), checking again for errors. Finally, if all goes well, it prints a confirmation message to let the user know the content was successfully appended to the file.
+
+% Run (go run ch05/append.go <filename> <text to append>)
+    - after the rnu, we can see both lines, showing that the program appended data correctly.
+
+
+!! System logging and logging to files:
+The log and log/slog packages implement structured logging with compile-time optimizations, while the interface-based architecture facilitates integration with highperformance third-party loggers. The log package provides a thread-safe logger built around a sync.Mutex-protected io.Writer instance. Each log operation acquires an exclusive lock, formats the message using fmt.Sprintf() style formatting, and performs a single write syscall.
+
+x Go's logging ecosystem operates on a foundation of interface-driven design and zero-allocation principles (designing and using operations that do not produce unnecessary heap allocations during normal execution), providing simplicity for basic use cases with extensibility for complex systems.
+
+Go 1.21 introduced log/slog, a structured logging package designed around key-value pairs and hierarchical contexts. When slog processes log messages, it uses a Handler interface to allow different output backends, such as JSON files, syslog, or external logging services, to be plugged in easily.
+
+% Let us see all these features in action in (ch05/logging.go)
+    - The purpose of this struct is to aggregate multiple writers so that the same data can be written to several destinations at once. Each element in the writers slice represents a target for output, which could be a file, standard output, a network connection, or any other type that implements the io.Writer interface.
+    - The Write() method of the multiWriter struct is designed to broadcast a single byte slice to multiple output destinations. Unlike a strict sequential implementation that halts at the first sign of trouble, this version adopts a more resilient approach. By iterating through the entire slice of io.Writer objects, the method ensures that a failure in one destination does not prevent the remaining sinks from receiving the data. In this implementation, the loop continues regardless of whether an individual Write() call succeeds or fails. If an error occurs, it is captured locally so that it can be returned at the end of the operation, but it does not interrupt the broadcast to the other writers. The function ultimately returns the length of the p input slice to signal that the data has been processed by the broadcast logic, along with any errors encountered during the process.
+    - The code begins by creating or opening a log file at /tmp/app.log using os.OpenFile(). The file permissions are set to 0644, meaning it is readable by everyone but writable only by the owner. Next, a syslog writer is initialized using syslog.New(), which connects the application to the system logging facility. The arguments specify the log priority (LOG_INFO) and facility (LOG_LOCAL0), as well as a "myapp" tag to identify log entries. Finally, the program combines the file writer, the standard output stream (os.Stdout), and the syslog writer into a single multiWriter instance. This allows subsequent log messages to be written simultaneously to all three destinations, ensuring consistent and redundant logging across different outputs.
+    ? log/syslog package does not work on windows.
+    - First, the code creates a JSON log handler with slog.NewJSONHandler(), passing in the custom multiWriter instance so that all log messages will be written a simultaneously to the log file, standard output, and syslog. The &slog.HandlerOptions{} argument specifies default handler options, but could be customized to control log levels, timestamps, or formatting. Next, a logger instance is created with slog.New(handler), which becomes the central logging instance for the application. The logger instance is then used to write several structured log entries. An informational message logs the application startup, while a debug log records details about a simulated request, attaching key-value pairs (id, user, and attempt) that make the log entries more searchable and machine-friendly. The code then calls a doSomething() function and, if it returns an error, logs the error with logger.Error(). Finally, the program logs a message indicating that the application finished successfully.
+
+% Execute (go run ch05/logging.go)
+    - The contents iof /tmp/app.log are the same as the ones in the output. Keep in mind that logging in JSON format provides structured, machine-readable entries that make it easier to parse, search, and analyze logs with modern tools, while remaining human-readable.
+
+? Debug logs does not appear in the log file. It we want them then we have to provide tevel attribute to the HandlerOption{}
+    % handler := slog.NewJSONHandler(w, &slog.HandlerOptions{Level: slog.LevelDebug})
+
+
+!! Unbuffered writing
+Page No: 211
