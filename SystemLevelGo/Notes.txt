@@ -1297,4 +1297,93 @@ Go 1.21 introduced log/slog, a structured logging package designed around key-va
 
 
 !! Unbuffered writing
-Page No: 211
+In unbuffered writing, data is written directly to the output destination without any intermediate buffering, the write operation being passed to the underlying system as soon as the write call completes. In most scenarios, unbuffered writing is less efficient than buffered writing as it increases the number of system calls and overhead involved. This is especially the case when performing many small writes.
+
+% The part of (ch05/unbufWrite.go) that illustrates unbuffered writing, for the case of data being written 1 byte at a time.
+    - The loop iterates over each byte in the fullData slice and creates a buffer single-byte slice to pass to file.Write(). Each call to Write() sends a single byte directly to the operating system, meaning that there is a separate system call for each byte. The program checks for errors after each write and terminates with an error message if one occurs. It also keeps track of the total number of bytes written in bytesWritten and counts the number of system calls in systemCalls.
+
+x This approach is highly inefficient for large data, as each byte incurs the overhead of a system call.
+
+!! Buffered writing
+As buffered reading reduces system calls on input, buffered writing does the same on output by using an intermediate memory buffer to accumulate data before sending it in larger chunks to the underlying output destination.The Go standard library offers the (bufio.Writer) type to facilitate buffered writing, allowing your program to write data efficiently by collecting it in memory and flushing it all at once or when the buffer is full. 
+
+% The following code is found in (ch05/bufWrite.go) and illustrates buffered writing.
+    - Instead of writing directly to the file 1 byte at a time, the code uses a buffered writer (writer, which is initialized as writer := bufio.NewWriter(file)), which collects data in memory before performing fewer, larger system calls to the operating system. Inside the loop, writer.WriteByte(fullData[i]) appends each byte from fullData into the writer's internal buffer, while bytesWritten counts the number of bytes successfully staged for writing. Unlike unbuffered I/O, these calls do not immediately reach the filesystem but are accumulated in the buffer. After the loop finishes, writer.Flush() is called to force any remaining buffered data to be written out to the file. Finally, file.Sync() ensures that the operating system flushes its own buffers to disk, making the data physically persistent.
+
+% The next code snippet from ch05/bufWrite.go shows how to write text data line by line using a buffered writer (lineWriter := bufio.NewWriter(file))
+    - The loop iterates over the lines slice, and for each string, it calls lineWriter.WriteString(line + "\n"). This writes the line along with a newline character, ensuring that each entry appears on a separate line in the output file. The method returns the number of bytes written (n) and an error value. If an error occurs, the program prints the error to standard error and exits the loop to avoid further writes. A counter, linesWritten, keeps track of how many lines were successfully written, and for each line, the program prints a confirmation message showing the line number and the number of bytes written.
+
+!! Benchmarking buffered and unbuffered writing
+Information obtained by benchmarking to compare the impact of using a buffer versus writing data directly to the output destination is especially useful when working with large datasets, high-frequency writes, or performance-critical applications. It can help you decide whether the added complexity of buffering is justified for your specific use case,
+
+% Execute (go test -bench=. ch05/writing_test.go)
+    x goos: windows
+    x goarch: amd64
+    x cpu: AMD Ryzen 7 7435HS                             
+    x BenchmarkUnbufferedWrite_1MB-16                1        3153929900 ns/op
+    x BenchmarkBufferedWrite_1MB-16                234           5496254 ns/op
+    x BenchmarkUnbufferedWrite_10MB-16               1        41993236200 ns/op
+    x BenchmarkBufferedWrite_10MB-16                22         153359973 ns/op
+    x PASS
+    ! ok      command-line-arguments  51.200s
+    - For the 1 MB file, unbuffered writing takes roughly 3.1 seconds per operation, wher% eas buffered writing completes the same task in only about 5.4 milliseconds, highlighting how buffering drastically reduces system call overhead. The difference becomes even more pronounced with larger files: writing 10 MB unbuffered takes nearly 41.9 seconds, while buffered writing handles it in approximately 1.5 second. So, as a rule of thumb, unbuffered writing should be reserved for scenarios where immediate data durability is more critical than raw throughput.
+
+!! Benchmarking buffer size in buffered writing
+As we have seen, when using buffered writing, data is first collected in memory and then flushed to the output destination in chunks. The size of the memory buffer directly influences performance: smaller buffers may result in frequent flushes and more system calls, while overly large buffers can waste memory without offering significant speed improvements. By running benchmarks with varying buffer sizes, you can determine the most effective configuration for your specific workload and file size, achieving a balance between write performance, memory usage, and system overhead.
+
+%  (ch05/buffer_test.go)
+    x goos: windows
+    x goarch: amd64
+    x cpu: AMD Ryzen 7 7435HS                             
+    x BenchmarkBufferedWrite_1MB_512-16                    110          12154498 ns/op
+    x BenchmarkBufferedWrite_1MB_4KB-16                    238           5223432 ns/op
+    x BenchmarkBufferedWrite_1MB_32KB-16                   326           3618821 ns/op
+    x BenchmarkBufferedWrite_1MB_256KB-16                  345           3649813 ns/op
+    x BenchmarkBufferedWrite_10MB_512-16                    12         192153150 ns/op
+    x BenchmarkBufferedWrite_10MB_4KB-16                    24         138768983 ns/op
+    x BenchmarkBufferedWrite_10MB_32KB-16                   39          52699928 ns/op
+    x BenchmarkBufferedWrite_10MB_256KB-16                  37          69800586 ns/op
+    x PASS
+    ! ok      command-line-arguments  20.572s
+    - The benchmarks systematically explore two file sizes (1 MB and 10 MB) with four different buffer sizes (512 bytes, 4 KB, 32 KB, and 256 KB) and reveal a clear performance improvement as buffer size increases. For the 1 MB file tests, execution time decreases from 12.15 milliseconds with a 512-byte buffer to 3.64 milliseconds with a 256 KB buffer, representing a 70% performance improvement. This pattern holds consistently for the 10 MB files as well, where performance improves from 192.15 milliseconds with 512-byte buffers to 69.8 milliseconds with 256 KB buffers – a 63% speedup. The diminishing returns between buffer sizes are also evident: the jump from 512 bytes to 4 KB provides substantial improvement, while the gains between 32 KB and 256 KB buffers are more modest, suggesting that beyond a certain buffer size, the benefit of reducing system calls will plateau while memory overhead increases.
+
+
+!! Benchmarking file copying :
+File copying is one of the most common operations in systems programming, and it gives us the opportunity to see in a practical setting how buffered writing strategies influence efficiency.When it comes to copying files in Go, there are several techniques you can use, each with its own trade-offs in terms of simplicity and performance. At a high level, the io.Copy() function offers a concise and reliable way to duplicate file contents, handling the details for you under the hood. For more control, you can use buffered copying with bufio, where you explicitly manage how much data is read and written at a time. Finally, the most granular method involves manually reading chunks of bytes with Read() and writing them with Write(), giving you full flexibility but requiring more code. We benchmark these approaches side by side to highlight how different strategies affect performance in real-world scenarios.
+
+% (ch05/copy_bench_test.go) compares the performance of three different filecopying strategies in Go – io.Copy(), buffered copying with a fixed buffer size, and manual readand- write loops – across files of two sizes, 1 MB and 10 MB
+    - The BenchmarkIOCopy_1MB() and BenchmarkIOCopy_10MB() functions use io.Copy(), which is highly optimized for speed and minimal overhead. The BenchmarkBuffer_1MB() and BenchmarkBuffer_10MB() functions measure performance when data is copied using custom buffer of 4 KB, allowing us to see how buffer size affects throughput. Finally, BenchmarkReadWrite_1MB() and BenchmarkReadWrite_10MB() test a manual loop that explicitly reads from the source and writes to the destination, providing maximum control but often at the cost of efficiency.
+
+% Execute (go test -bench=. ch05/copy_bench_test.go)
+    x goos: windows
+    x goarch: amd64
+    x cpu: AMD Ryzen 7 7435HS                             
+    x BenchmarkIOCopy_1MB-16               518           1968655 ns/op
+    x BenchmarkIOCopy_10MB-16               87          21489513 ns/op
+    x BenchmarkBuffer_1MB-16               151           9623685 ns/op
+    x BenchmarkBuffer_10MB-16               27          58947626 ns/op
+    x BenchmarkReadWrite_1MB-16            650           2127891 ns/op
+    x BenchmarkReadWrite_10MB-16           151           8124651 ns/op
+    x PASS
+    ! ok      command-line-arguments  14.014s
+    - Benchmark                     NameNanoseconds(ns/op)      Milliseconds(ms/op)         SpeedRank
+    - BenchmarkIOCopy_1MB-16        1,968,655 ns                1.97 ms                     1 (Fastest)
+    - BenchmarkReadWrite_1MB-16     2,127,891 ns                2.13 ms                     2
+    - BenchmarkReadWrite_10MB-16    8,124,651 ns                8.12 ms                     3
+    - BenchmarkBuffer_1MB-16        9,623,685 ns                9.62 ms                     4
+    - BenchmarkIOCopy_10MB-16       21,489,513 ns               21.49 ms                    5
+    - BenchmarkBuffer_10MB-16       58,947,626 ns               58.95 ms                    6 (Slowest)
+    ? This may change according to platforms like macOS, Linux and windows.
+
+
+!! Converting tabs to spaces and vice versa
+Text files often use tabs or spaces for indentation, but different projects and editors may have different conventions. Converting tabs to spaces — or spaces to tabs — is a common text-processing task to ensure consistent formatting and improve readability.
+
+% This parseMode() function – found in (ch05/t2s.go) – implements a bidirectional parser that interprets mode strings for tab-to-space and space-to-tab conversion operations, using the position of the numeric value relative to the word "tabs" to determine the conversion direction.
+    - The function code parses mode strings where the position of the number relative to "tabs" determines conversion direction: if the number comes before "tabs" (such as "4tabs"), it converts spaces to tabs using that tab width, while if the number comes after "tabs" (such as "tabs4"), it converts tabs to spaces using that number of spaces per tab. For example, parseMode("4tabs") returns direction="spaces-to-tabs" and count=4 (meaning replace every four spaces with a tab), while parseMode("tabs4") returns direction="tabs-to-spaces" and count=4 (meaning replace every tab with four spaces), and parseMode("invalid") returns an error because it does not match either pattern. 
+    
+% Try (go run t2s.go -mode=tabs4 ../../Notes.txt Output.txt) on your own files.
+    - It will create another copy with the name "Output.txt" with changes.
+
+
+!! Developing wc(1)
