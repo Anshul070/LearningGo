@@ -1409,4 +1409,145 @@ The classic Unix wc(1) utility is a simple yet powerful tool that counts the num
     - What I made is that it already has a log file where logs are stored as file runs, but we can import logs from other files usgin "-imp=" flag.
 
 % 2. Change (ch05/newFile.go) so that it accepts the file as an argument.
-    
+
+
+
+!! -------------------------------------------------------------------------------CHAPTER 14---------------------------------------------------------------------------
+
+
+!! Creating an Index for Unix Files
+We do not just want to store data — we want to find it, understand it and connect it. An index can transform chaos into clarity, converting raw structure into searchable knowledge. From a different perspective, indexing files is an exercise in epistemology — the study of knowledge. What do we need to know about a file or directory? What makes that information retrievable and meaningful? The decisions you make while designing an index — what to record, how to categorize, which metadata to preserve — are all reflections of deeper assumptions about purpose, access, and utility.Technically speaking, this chapter explores how to traverse Unix filesystems and how to construct meaningful indexes that can power everything from file search utilities to metadatadriven applications.
+~ This chapter covers the following topics:
+    - Understanding binary trees
+    - Understanding radix trees
+    - Creating a filesystem index service
+    - Creating a command-line client
+
+
+!! Understanding Binary Trees
+A binary tree is hierarchical data structure in which each node has at most two child nodes, commonly referred to as the left and right child. It is one of the most widely used data structures in computer science because it organizes data in a way that makes searching, inserting, and deleting efficient. In a binary search tree (BST), a special type of binary tree, the left subtree contains values less than the parent node, whereas the right subtree contains values greater than the parent. This structure allows operations such as search and insertion to be performed in O(log n) time on average, making binary trees a foundation for implementing efficient storage systems, databases, compilers, and many algorithms. Implementing a binary tree will help you understand its operation better – this knowledge is going to be used when we talk about radix trees. To support the construction of our indexing engine, we will leverage the improved new() function introduced in Go 1.26. This enhancement allows us to allocate and initialize our binary tree nodes in a single step, providing a cleaner and more performant way to build the search hierarchy.
+
+!! A sweet improvement to new()
+Go 1.26 updated the built-in new() function to accept expressions, merging memory allocation and initialization into a single step. Previously, new(T) only zero-initialized memory, forcing developers to use separate assignment statements or temporary variables to establish initial values. With this update, the compiler infers the type from the provided value, allocates the necessary storage on the heap, initializes it, and returns the pointer immediately.
+
+% See new() in action in (ch14/newNew.go)
+    - The program defines a ServerConfig struct where Port, Enabled, and Name are pointers; this is a standard pattern used to distinguish between a zero value (such as port 0) and a missing configuration (nil). Inside main(), the code initializes these fields inline using the new syntax:
+    x new(8080) and new(true)
+    - which creates a pointer to a specific value immediately rather than just allocating zeroed memory. The difference lies in what new() accepts as an argument. 
+    - In all previous versions of Go, new() accepted a type such as new(int), which would allocate memory, set it to the zero value of the type (0), and return a pointer. To achieve what this code does in older versions, a developer was forced to declare a temporary variable such as p := 8080 and
+
+
+% Run (go run ch14/newNew.go)
+    ~ Config: API Server running on port 8080 (Enabled: true)
+    ~ User: &{1 admin}
+    - In the first line, you see the plain values API Server, 8080, and true because the code explicitlydereferenced the pointers using the * operator. In the second line, you see the standard Go representation of a pointer to a struct.
+
+
+% With that in mind, let us present the implementation of a binary tree in Go as found in ch14/binaryTree.go, starting with the definition of the binary tree itself and its nodes.
+    ~ type Node struct {
+    ~   Value int
+    ~   Left *Node
+    ~   Right *Node
+    ~ }
+    ~ type Tree struct {
+    ~   Root *Node
+    ~   mu sync.RWMutex
+    ~ }
+    x The code defines the fundamental structures for a thread-safe BST. The Node struct acts as the atomic unit of the data structure, encapsulating the data payload (Value) and the structural links (Left and Right) that define the tree's recursive hierarchy.
+    - By using pointers for the children, the structure allows for the dynamic growth of the tree, where a nil pointer signifies a leaf node or an empty path. This recursive definition is the standard approach for creating self-referential data structures, enabling algorithms to traverse depth or breadth by following memory addresses. The Tree struct serves as the public entry point. Rather than exposing the Node pointers directly, Tree wraps the Root pointer alongside a sync.RWMutex instance. The logic behind including a reader-writer mutex specifically, rather than a standard mutex, is to optimize for a common access pattern in databases and caches where "reads" (searches) vastly outnumber "writes" (insertions or deletions). This decision allows multiple goroutines to traverse the tree simultaneously without blocking each other, while still ensuring that any modification obtains an exclusive lock to prevent data races, balancing safety with highthroughput performance.
+
+% Next, we show the code for the Insert() method as well as the insert() helper method
+    - The separation of node insertion into two distinct methods — a public method on the Tree struct and a private recursive helper on the Node struct — decouples concurrency control from algorithmic traversal. 
+    - The public (t *Tree) Insert() method is primarily responsible for establishing the correct execution context for the operation: it acquires the t.mu.Lock() function to ensure that the entire insertion sequence is atomic and thread safe. By handling the lock at the Tree level, we guarantee that the mutex is acquired exactly once per operation, avoiding the performance overhead and potential deadlocks of recursive locking.
+    - Additionally, this method handles the structural edge case where the tree is empty (t.Root == nil), a state that a nodelevel method cannot easily resolve since no nodes exist yet to receive the call. Once the safety and initial state are established, the logic delegates to the private (n *Node) insert() method, which acts as the recursive engine. 
+    - This method focuses on the binary search algorithm: comparing values to the current node and traversing down the Left or Right pointers. It is here that the actual memory modification occurs, utilizing the new Go 1.26 new(Node{...}) syntax to allocate and link new nodes directly into the structure. So, the Tree struct manages locks and root existence, whereas the Node struct manages the logic and links, preventing the mixing of synchronization primitives with recursive business logic.
+
+% In the same style, here we have Search() and search()
+    - The search implementation mirrors the architectural pattern of insertion but diverges critically in its concurrency model to optimize for read-heavy workloads. Instead of the exclusive lock used previously, this method employs t.mu.RLock() (read lock). Once the shared lock is acquired, the public method performs a quick existence check — immediately returning false if the tree is empty — before delegating to the recursive helper. The internal logic leverages the sorted nature of the BST to achieve logarithmic time complexity: it compares the target value instance against the current node, returning true on a match or recursively descending into the Left or Right child based on whether the target is smaller or larger. 
+
+% The last set of methods is for printing the tree in three different ways:
+    - The necessity forthree distinct traversal strategies arises because visiting a node has radically different utility depending on when it occurs relative to the node's structural dependencies. While all three methods visit every node exactly once, the timing dictates the algorithm's application.
+    ~ We use in-order traversal when the semantic value of the data is paramount; for a BST, this is the only strategy that linearizes the hierarchy into a sorted sequence, flattening the tree into a human-readable list. 
+    ~ However, when the structure itself is the critical data, we turn to pre-order. By processing the root before its subtrees, this traversal generates a serialization stream that can be read back sequentially to reconstruct the exact original shape of the tree — a requirement for network transmission or disk persistence where the hierarchy must be preserved. 
+    ~ Post-order is the algorithm of dependency resolution and cleanup. By deferring the processing of a node until after its children are complete, it ensures that we never operate on a parent until its dependencies are resolved. This bottom-up approach is indispensable for systems tasks such as safe memory deallocation (deleting children before the parent) or directory size calculations, where a folder's total size cannot be known in advance.
+
+% Execute (go run ch14/binaryTree.go)
+    - Lines beginning with [Insert] refer to the insertion of nodes based on the values stored as values := []int{8, 3, 10, 1, 6, 14, 4, 7, 13}. These lines appear out of numerical order because multiple goroutines are racing to acquire the lock; this confirms that the Go scheduler is managing execution non-deterministically, yet sync.Mutex successfully serialized every write to prevent data corruption.
+    - The InOrder list is perfectly sorted (1 3 4...), validating that the binary search property (Left < Root < Right) was maintained throughout the concurrent insertions. 
+    - The PreOrder sequence starting with 3 reveals the tree topology, indicating that 3 was the first node successfully locked and established as the root. The PostOrder traversal output (1 6 7 4 10 8 14 13 3) reveals the dependency structure of the tree. In this mode, the root is always the last element printed because the algorithm strictly processes children before their parents (Left -> Right -> Root).
+    - This specific sequence tells us that 1 and 6 are leaf nodes (or at least the bottom-most nodes in their respective subtrees) because they appear first. We can deduce that 7 is the parent of 6 (or 6 is the left child of 7), 4 is the parent of 7, and so on, cascading all the way up to 3, which is the absolute root of the tree. 
+    ~ This bottom-up ordering is exactly what you would use if you needed to delete the tree safely, ensuring you free the memory for leaves 1 and 6 before you ever touch root 3. 
+    - Finally, the [Search] results confirm that the read-lock (RLock) logic works correctly, accurately finding existing nodes such as 7 and 13 while returning false for values such as 2 and 15.
+
+? Instead of comparing entire values at each step, radix trees store and compare common prefixes of keys, making them particularly efficient for scenarios involving strings, prefixes, or hierarchical data such as IP addresses. In binary tree, each node decides to go left or right based on comparisons, whereas in a radix tree, traversal follows shared segments of a key, potentially skipping multiple characters or bits in a single step. This makes radix trees highly space-efficient when many keys share common prefixes and faster for operations such as prefix matching. Understanding these differences will help you see why radix trees are often preferred in applications such as routing tables, search engines, and autocompletion systems, where prefix-based lookups outperform traditional BSTs.
+
+
+!! Understanding Radix Trees
+A radix tree, also known as a compact prefix tree or Patricia trie, is an efficient data structure for storing stringse with shared prefixes. It reduces memory by merging single-child nodes. The following radix tree plot visually represents a compact prefix tree built from the words go, gone, good, gopher, god, golf, golden, galaxy, game, and gamma. At the very top, the tree starts with an empty string node "", which connects to a single child node labeled g, because all words begin with the letter g. This node branches into several distinct paths based on the next letters that follow in each word.
+
+~                                                                       | "" |
+#                                                                         |
+!                                                                       | g |
+#                                                     |              
+-                                                   | o |                                  | a |
+#                                      |        |           |        |               |       |          |
+x                                   | ne |   | od |       | d |    | i |          |laxy|   | me |    | mma |
+
+
+
+One major branch is from g to o, covering all words that begin with go — specifically, go, gone, good, gopher, god, golf, and golden. From the o node, the tree splits into several shorter prefixes: ne for gone, od for good, pher for gopher, d for god, l for golf, and lden for golden. Each of these nodes is marked as a terminal node in the tree, indicating the end of a complete word. Aside from the go branch, the g node also branches to alaxy, representing the word galaxy; to ame, representing game; and to amma, representing gamma. These nodes do not branch further because no other words in the dataset share their prefixes beyond that point, and they are also marked as terminal nodes. The structure of the plot reflects the compactness of a radix tree. Instead of storing one character per node as in a traditional trie, this tree compresses linear chains of nodes into single nodes containing substrings. For example, instead of representing game as four separate nodes (g → a → m → e), the tree uses one edge from g to ame, which is more spaceefficient and faster for lookups.
+
+This radix tree is particularly effective for prefix-based lookups and space-efficient storage, making it a useful structure for systems programming tasks such as file path resolution, command autocompletion, or configuration key lookup.
+
+% Let us now look at the most important parts of our radix tree implementation (ch14/radixTree.go), starting with the structures that support it.
+    ~ type Node struct {
+    ~   prefix string
+    ~   children []*Node
+    ~   isWord bool
+    ~ }
+    ~ type RadixTree struct {
+    ~   root *Node
+    ~ }
+    - The logic of the radix tree centers on the Node struct, which stores a prefix string rather than a single character. This design implements path compression, whereby sequences of nodes with single children are merged into a single edge, significantly reducing the tree height and memory footprint for sparse datasets.
+    - The children slice manages branching paths, allowing the tree to split where prefixes diverge, while the isWord Boolean serves as a guard. This flag distinguishes between nodes that represent complete, valid keys and internal nodes that exist solely as structural bridges to longer words.
+    - The RadixTree struct acts as the public handle for the entire structure, encapsulating the root pointer. This separation allows the RadixTree struct to manage tree-wide concerns — such as locking or handling an empty tree state — without interfering with the recursive logic of individual nodes.
+
+% A new radix tree is created as follows:
+    ~ func NewRadixTree() *RadixTree {
+    ~   return new(RadixTree{
+    ~       root: new(Node{}),
+    ~   })
+    ~ }
+    - The NewRadixTree() function serves as the constructor for the data structure, ensuring that it is initialized in a valid, usable state. The use of new() makes sure that the tree is a heap-allocated, persistent structure ready for immediate use.
+
+% The Insert() method orchestrates the logic of path compression, ensuring that the tree remains compact by storing string segments rather than individual characters:
+    - When the input string shares only a partial prefix with a child node, the algorithm performs an edge split: it truncates the current node to the shared prefix and pushes the remaining characters into a new child node, inserting a new fork in the road without breaking the existing hierarchy. If no common prefix is found among the children, the logic identifies a completely new branch and appends a new node using the new() syntax.
+    - If the algorithm consumes the entire input string while traversing, it marks the terminating node as a valid word. This logic ensures that the tree depth is determined by the distinctiveness of stored keys rather than their length.
+
+% The Search() method implements the retrieval logic for the radix tree, designed to verify the existence of a specific string with maximum efficiency
+    - Unlike a standard search that might compare the target string character by character against a list, this algorithm traverses the tree structure, consuming the search word in chunks that match the compressed prefixes stored in the nodes. 
+    - The process is iterative: at each current node, it scans the children to find one whose stored prefix completely matches the beginning of the remaining search string. The logic handles three distinct outcomes during this traversal. 
+    - If a child's prefix matches the start of the search word, the algorithm consumes that portion of the word and descends deeper into the tree. If it finds a child that shares some characters but not the full prefix, it immediately knows the word does not exist in the tree because the path diverges at that point.
+    - Finally, if the algorithm successfully consumes the entire search word and lands exactly on a node boundary, it checks the isWord() flag; this ensures that finding a prefix returns false if only the longer word was inserted.
+
+% The StartsWith() method implements the logic for prefix matching, a feature distinct from exact word retrieval and essential for applications such as autocomplete or predictive text
+    - While the code shares the traversal mechanism of Search(), its success condition is significantly broader: it does not require the isWord flag to be set, nor does it require the tree path to end exactly where the input string ends. The algorithm traverses the nodes, consuming the input prefix in chunks that match the compressed edges of the tree. 
+    ~ If the algorithm encounters a node whose stored string is longer than the remaining search prefix (e.g., searching for "auto" and hitting a node storing "automobile"), it immediately returns true.
+    - This works because the existence of the longer path logically proves that the shorter prefix exists within the tree.
+    - Conversely, if the search prefix is longer than the current node, the algorithm continues descending. If the navigation can successfully trace the entire length of the input string without diverting from the tree structure, the method confirms that the prefix is valid, regardless of whether it stops mid-edge or at a node boundary.
+
+% Execute (go run ch14/radixTree.go)
+    x Search("go"): true
+    x Search("gone"): true
+    x Search("god"): false
+    x Search("gob"): false
+    x Search("gopher"): true
+    x Search("zeb"): false
+    x Search("zebra"): true
+    x StartsWith("go"): true
+    x StartsWith("gop"): true
+    x StartsWith("zeb"): true
+    x StartsWith("x"): false
+    - The Search("zebra") instance returns true because it is a stored key, whereas Search("zeb") returns false. Even though "zeb" exists physically in memory as part of the compressed path to "zebra", it was never explicitly inserted as a key, so its isWord flag remains false. However, the StartsWith results ignore this sentinel flag, returning true for inputs such as "zeb", "go", and "gop". The negative results demonstrate the tree's efficiency in early rejection: as soon as the path diverges, the search aborts immediately.
+
+Page : 520
