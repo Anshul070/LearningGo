@@ -1226,14 +1226,14 @@ Reading a file line by line is one of the most common patterns when processing t
 Sometimes it is necessary to process a file at the word level rather than line by line, for example, in tasks such as text analysis, word frequency counting, or parsing structured input where individual tokens matter. The bufio.Scanner utility supports this word-level processing via the ScanWords split function, which tokenizes the input on whitespace boundaries.
 
 % Look at the (ch05/wordByWord.go) file;
-    - The readWords() function reads the contents of a text file and returns them as a slice of words. The function uses a bufio.Scanner instance to process the file content and configures it with scanner.Split(bufio.ScanWords), which instructs the scanner to break the input into words instead of lines (bufio.ScanLines). Inside a loop, each word is appended to the words slice. When scanning is complete, the function checks, with scanner.Err(), for any errors that may have occurred during scanning. If no errors are encountered, it returns the full slice of words and a nil error.
+    - The ReadWords() function reads the contents of a text file and returns them as a slice of words. The function uses a bufio.Scanner instance to process the file content and configures it with scanner.Split(bufio.ScanWords), which instructs the scanner to break the input into words instead of lines (bufio.ScanLines). Inside a loop, each word is appended to the words slice. When scanning is complete, the function checks, with scanner.Err(), for any errors that may have occurred during scanning. If no errors are encountered, it returns the full slice of words and a nil error.
 
 
 !! Reading a file character by character
 For certain applications, such as lexical analysis, syntax parsing, or fine-grained text processing, reading a file character by character is essential. In Go, this can be achieved using bufio.Reader with ReadRune(), which properly handles Unicode characters while giving precise control over each character read. This method allows programs to inspect, transform, or validate text at the smallest meaningful unit, supporting tasks that require detailed parsing or incremental processing of both ASCII and non-ASCII content.
 
 % The code is inside (ch05/charByChar.go)
-    - The readChars() function reads a text file character by character and returns its contents as a slice of runes. It takes an already opened *os.File instance as input and wraps it in a bufio.NewReader() function, which provides buffered reading for efficiency. Inside an infinite loop, it calls reader.ReadRune(), which reads the next UTF-8 encoded character from the file and returns it as a rune. If an error occurs, the function checks whether it is io.EOF, which signals the end of the file; in that case, the loop breaks cleanly. Any other error is returned immediately. Each successfully read rune is appended to the chars slice, ensuring that multi-byte characters are handled correctly.
+    - The ReadChars() function reads a text file character by character and returns its contents as a slice of runes. It takes an already opened *os.File instance as input and wraps it in a bufio.NewReader() function, which provides buffered reading for efficiency. Inside an infinite loop, it calls reader.ReadRune(), which reads the next UTF-8 encoded character from the file and returns it as a rune. If an error occurs, the function checks whether it is io.EOF, which signals the end of the file; in that case, the loop breaks cleanly. Any other error is returned immediately. Each successfully read rune is appended to the chars slice, ensuring that multi-byte characters are handled correctly.
     - The main() function provides a simple entry point for reading characters from either a file or standard input. It begins by checking whether a filename has been provided as a command-line argument. If a filename is given, the program attempts to open the file, handling any errors by printing an appropriate message to standard error and exiting. A defer input.Close() function ensures that the file is properly closed after use. If no filename is provided, the program defaults to reading from standard input, making it flexible enough to handle both files and piped input. Once the input source is determined, it calls readChars() to extract the contents as a slice of runes. Any error during this step is reported and causes the program to terminate. Finally, the program loops through the characters, printing each one along with its position.
 
 
@@ -1386,4 +1386,27 @@ Text files often use tabs or spaces for indentation, but different projects and 
     - It will create another copy with the name "Output.txt" with changes.
 
 
-!! Developing wc(1)
+!! Developing wc(1):
+The classic Unix wc(1) utility is a simple yet powerful tool that counts the number of lines, words, and characters in a text file. Recreating this functionality in Go provides an excellent exercise in file processing and text scanning, as it combines reading from files with efficient counting techniques. Rather than treating each count separately, a single pass through the file can update all three metrics at once, demonstrating how careful design can save time and resources. Creating three separate functions for counting lines, words, and characters independently would require opening and reading the same file three times, wasting I/O operations and CPU cycles. The count() function serves as the core statistical analysis engine of the word count utility, accepting any io.Reader interface as input. This allows it to work seamlessly with files, standard input, network streams, or any other readable data source in Go.
+
+% Look at (ch05/wc.go)
+    - The function returns four metrics using named return values: lines, words, bytes and runes (Unicode characters), which are accumulated over the course of the reading process. It begins by wrapping the input reader with bufio.NewReader to create a buffered reader, which significantly improves performance by reducing the number of system calls. The main logic of the function is within the infinite for loop that reads one line at a time using buf.ReadString('\n'), which returns both the line content (including the newline delimiter) and an error value. For each nonempty line, the function does the following:
+    ~ Increments the line counter
+    ~ Trims trailing carriage return and newline characters using strings.TrimRight() (handling both Unix and Windows line endings)
+    ~ Delegates word counting to the specialized countWordsInLine function
+    ~ Accumulates the byte count using len(line), which returns the number of bytes in the string
+    ~ Calculates the rune count using utf8.RuneCountInString(), which properly counts Unicode characters that may span multiple bytes, adding one to account for the newline character itself
+    - Not shown here is printCounts(), which handles the presentation layer. It formats the count results to match the wc(1) output style, with right-aligned seven-character-wide columns. It implements the default behavior (showing lines, words, and bytes when no flags are specified) and selectively displays only the requested metrics based on command-line flags.
+
+
+!! Summary
+! As we conclude this chapter on file I/O in Go, We have learned : Filepath existance, Reading files, File Seeking, Unbuffered Reading, Buffered Reading, Reading Line By Line, Reading Word By Word, Reading Char By Char, Writing File, Creating New Files, Appending To Files, System Logging And Logging To Files, Unbuffered Writing, Buffered Writing, File Copying, Converting Tabs TO Spaces Or Vice Versa, and Finaly Developing wc(1).
+
+
+!! Exercises: 
+
+% 1. Make (ch05/logging.go) accept the log file as a command-line argument.
+    - What I made is that it already has a log file where logs are stored as file runs, but we can import logs from other files usgin "-imp=" flag.
+
+% 2. Change (ch05/newFile.go) so that it accepts the file as an argument.
+    
